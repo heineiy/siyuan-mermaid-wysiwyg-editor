@@ -21,8 +21,12 @@
  * 的并发写回不会叠加，无需额外锁。竞态锁 isSyncing + 版本号比对属 T12 职责，
  * 本文件只把写回函数（writeFenced）与防抖实例内聚成 seam（T12 可直接包装）。
  *
- * 错误处理（本任务最小处理，T13 完善 UI）：backend init 拒绝（如 VisimerLoadError）
- * 不抛未捕获异常，错误 message 渲染进画布容器（一个简单错误 div）。
+ * 错误处理（REQ-ERROR-001，T13）：backend init / adapter init 抛错或拒绝（如
+ * VisimerLoadError）不抛未捕获异常，错误 message 渲染进画布容器（简单错误 div，
+ * 完整 UI 样式非本期重点），且**不建立写回通道**（init 失败后 onGraphChange /
+ * flushWrite 均不可达，updateBlock 零调用——保留原文本）；会话仍可 destroy 清理。
+ * 只读路径：兜底 ReadOnlyAdapter 注入 onError，渲染/解析失败（含语法错误）时把
+ * 可读错误提示渲染进画布容器，不写回坏数据。
  *
  * 会话生命周期：destroy() = flush 未决写回 + adapter.destroy + cancel 防抖，幂等；
  * destroy 后 onGraphChange / flushWrite 不再触发写回。
@@ -110,6 +114,9 @@ export async function initEditorSession(opts: InitEditorSessionOptions): Promise
       let isSyncing = false;
       // 锁内到达的最新代码：写回完成后立即补写（绝不丢弃最后一次编辑）。
       let pendingCode: string | null = null;
+      // T13（REQ-ERROR-001）：init 失败后关闭写回通道——适配器残留的 onGraphChange
+      // 回调不可达、flushWrite 无副作用，updateBlock 保持零调用（保留原文本）。
+      let writeClosed = false;
 
       const writeFenced = (newCode: string): void => {
         if (isSyncing) {
@@ -135,28 +142,45 @@ export async function initEditorSession(opts: InitEditorSessionOptions): Promise
         };
         try {
           // Promise.resolve 吸收同步返回与异步 Promise 两种形态；then 双参统一
-          // 成功/拒绝两条路径（拒绝侧只释放锁 + 补写 pending，UI 报错属 T13）。
+          // 成功/拒绝两条路径（REQ-ERROR-001：拒绝侧只释放锁 + 补写 pending，
+          // 不把错误扩散为未捕获异常）。
           void Promise.resolve(updateBlock(blockId, fenced)).then(complete, complete);
         } catch {
-          complete(); // 同步抛错兜底：释放锁，不卡死会话（T13 完善错误处理）。
+          complete(); // 同步抛错兜底：释放锁，不卡死会话（不扩散未捕获异常）。
         }
       };
       const writeDebounce = createDebounce(writeFenced, debounceMs);
       const onGraphChange = (newCode: string): void => {
-        if (destroyed) {
-          return; // 会话已销毁：不再聚合新的写回
+        if (destroyed || writeClosed) {
+          return; // 会话已销毁 / init 失败关闭写回通道：不再聚合新的写回
         }
         editVersion += 1; // 每次编辑递增版本号：后续写回完成时据此识别"期间有新编辑"
         writeDebounce.call(newCode);
       };
 
-      // backend init 拒绝（如 VisimerLoadError）：最小处理——不抛未捕获异常，
-      // 错误 message 渲染进画布容器（一个简单错误 div；T13 完善 UI）。
+      // backend / adapter init 抛错或拒绝（如 VisimerLoadError）：REQ-ERROR-001
+      // 错误保护——不抛未捕获异常，错误 message 渲染进画布容器（一个简单错误 div；
+      // 完整 UI 样式非本期重点），**不建立写回通道**（updateBlock 零调用，保留
+      // 原文本），会话仍可 destroy 清理（adapter.destroy 幂等）。
       try {
         // Promise.resolve 吸收同步抛错与拒绝的 Promise 两种形态。
         await Promise.resolve(adapter.init(code, { container, onGraphChange }));
       } catch (err) {
         renderMessage(container, `可视化编辑器加载失败：${errorText(err)}`, ERROR_DIV_CLASS);
+        writeClosed = true;
+        // 清掉 init 期间可能已聚合的变更（防御性：写回通道自此关闭）。
+        writeDebounce.cancel();
+        return {
+          // 失败会话无写回通道：flush 零副作用（不调用 updateBlock）。
+          flushWrite(): void {},
+          destroy(): void {
+            if (destroyed) {
+              return;
+            }
+            destroyed = true;
+            adapter.destroy();
+          },
+        };
       }
 
       return {
@@ -182,7 +206,14 @@ export async function initEditorSession(opts: InitEditorSessionOptions): Promise
 
     case "readonly": {
       // 已注册 readonly 适配器优先；无则 new ReadOnlyAdapter 兜底只读渲染。
-      const adapter = result.adapter ?? new ReadOnlyAdapter();
+      // T13（REQ-ERROR-001）：兜底适配器注入 onError——渲染/解析失败（含语法
+      // 错误）时把可读错误提示渲染进画布容器，不写回坏数据（updateBlock 零调用）。
+      const adapter =
+        result.adapter ??
+        new ReadOnlyAdapter({
+          onError: (err) =>
+            renderMessage(container, `只读预览渲染失败：${errorText(err)}`, ERROR_DIV_CLASS),
+        });
       try {
         await Promise.resolve(adapter.init(code, { container, onGraphChange: noopOnGraphChange }));
       } catch (err) {

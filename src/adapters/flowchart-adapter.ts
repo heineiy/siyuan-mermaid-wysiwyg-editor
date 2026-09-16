@@ -39,14 +39,22 @@ export class FlowChartAdapter implements DiagramAdapter {
     this.backendFactory = options.backendFactory ?? visimerBackendFactory;
   }
 
-  init(code: string, opts: AdapterOptions): void {
+  /**
+   * 装配后端并转发其 init 的 Promise（w4 review Important → T13）：
+   * backend.init 失败（如 VisimerLoadError）以拒绝上报到本 init 的返回值，
+   * 上层（sync.ts try/catch）可 await 捕获，不产生未处理拒绝。
+   * 返回 Promise<void>：TS 上满足 DiagramAdapter 的 void 契约（参考 T7 ReadOnlyAdapter）。
+   */
+  async init(code: string, opts: AdapterOptions): Promise<void> {
     // 幂等：重复 init 先销毁旧实例再重建。
     this.destroy();
 
     // 创建/复用后端：显式注入的 backend 优先，缺省经工厂创建。
     const backend = opts.backend ?? this.backendFactory.create();
     this.backend = backend;
-    backend.init(code, { container: opts.container, onGraphChange: opts.onGraphChange });
+    // 转发 backend.init 的 Promise：加载/渲染失败（如 VisimerLoadError）以拒绝上报，
+    // 供上层捕获；失败后 destroy 仍可清理本实例持有的后端（幂等）。
+    await backend.init(code, { container: opts.container, onGraphChange: opts.onGraphChange });
   }
 
   destroy(): void {

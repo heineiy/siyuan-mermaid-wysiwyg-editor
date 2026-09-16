@@ -162,3 +162,46 @@ describe("FlowChartAdapter：缺省后端工厂", () => {
     });
   });
 });
+
+describe("FlowChartAdapter：init 转发 backend 拒绝（w4 review Important → T13）", () => {
+  it("backend.init 拒绝时 adapter.init 的 Promise 被转发（可 await 捕获，不产生未处理拒绝）", async () => {
+    class RejectBackend implements RenderBackend {
+      async init(): Promise<void> {
+        throw new Error("visimer load failed");
+      }
+      destroy(): void {}
+    }
+    const adapter = new FlowChartAdapter();
+    const onGraphChange = vi.fn();
+
+    let captured: unknown;
+    try {
+      await adapter.init("graph TD; A-->B", {
+        container: makeContainer(),
+        backend: new RejectBackend(),
+        onGraphChange,
+      });
+    } catch (err) {
+      captured = err;
+    }
+
+    // 拒绝经 adapter.init 转发：上层可捕获（sync.ts try/catch 接得住）
+    expect(captured).toBeInstanceOf(Error);
+    expect((captured as Error).message).toContain("visimer load failed");
+    // 失败不产生任何编辑回调
+    expect(onGraphChange).not.toHaveBeenCalled();
+    // 失败后 destroy 仍安全（幂等清理失败后端）
+    expect(() => adapter.destroy()).not.toThrow();
+  });
+
+  it("缺省后端（真实 Visimer 懒加载失败）同样以拒绝上报 VisimerLoadError，可被 await 捕获", async () => {
+    const adapter = new FlowChartAdapter();
+    const onGraphChange = vi.fn();
+
+    await expect(
+      adapter.init("graph TD; A-->B", { container: makeContainer(), onGraphChange })
+    ).rejects.toMatchObject({ code: "VISIMER_LOAD_FAILED" });
+    expect(onGraphChange).not.toHaveBeenCalled();
+    expect(() => adapter.destroy()).not.toThrow();
+  });
+});
