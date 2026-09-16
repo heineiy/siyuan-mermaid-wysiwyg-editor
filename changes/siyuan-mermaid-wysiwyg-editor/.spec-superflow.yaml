@@ -2,7 +2,7 @@
 # Derived data. Always rebuildable from artifacts. Lost/corrupt → fall back to content-level detection.
 
 # === Core state ===
-state: executing
+state: closing
 workflow: full
 revision: 1
 
@@ -15,15 +15,15 @@ execution_mode: sdd
 execution_plan_hash: sha256:6e38e4dd25326e521ba0e568083a64fd44fe1a45c2a2855ce4ed78f4c4f1c9e4
 execution_plan_revision: 1
 batches_completed: 0
-test_result: null
-spec_merged: false
-spec_publication_receipt: null
+test_result: pass
+spec_merged: true
+spec_publication_receipt: eyJ2ZXJzaW9uIjoxLCJzb3VyY2VfaGFzaCI6InNoYTI1NjowODk1M2EyNTZlMThhZTI2YjViYWQyZjY5ZjU5MThiMGQ3NjI4ZmZlYWJkNjk3NDVhMzI2YWNlYzkxODgzOGNhIiwiYmFzZWxpbmVfYmVmb3JlX2hhc2giOiJzaGEyNTY6MjYyYzdlZTFhMThjODRjY2ViMjliOTgxNzdhZjVlMmE0ZGEyZjc5Y2U3ZGZmOGVkM2YzNGYwNWY3Y2VmYTZkYyIsImJhc2VsaW5lX2FmdGVyX2hhc2giOiJzaGEyNTY6OTc2ZDVmNmQyM2U5MGNlZDMyMGY2MDVjMDFjMDk2NWE3MDFkZjQzMzcyNmYzNzlkNmZmYzhjOTJlYjRkOTZjZSIsImNhcGFiaWxpdGllcyI6WyJ2aXN1YWwtZWRpdG9yIl19
 
 # === Metadata ===
 change_name: siyuan-mermaid-wysiwyg-editor
-last_transition: 2026-09-16T06:43:06.443Z
-last_transition_from: approved-for-build
-last_transition_to: executing
+last_transition: 2026-09-16T09:12:54.655Z
+last_transition_from: executing
+last_transition_to: closing
 
 # === Decision points ===
 dp_0_decisions: change_name=siyuan-mermaid-wysiwyg-editor; intent=构建思源笔记Mermaid代码块双向WYSIWYG可视化编辑插件(flowchart全编辑+其它图类型降级只读+§8兼容扩展层); constraints=100%兼容思源原生Markdown存储(卸载零损坏),拖拽高频不落盘(500ms防抖+onDragEnd flush),不重写思源渲染引擎,以设计文档v1.0为基线; scope=含§8兼容扩展; communication=逐项询问; artifact_language=zh-CN; workflow_path=full
@@ -42,7 +42,7 @@ dp_5_result: null
 dp_5_timestamp: null
 dp_5_decisions: null
 dp_5_confirmed: null
-dp_6_result: null
-dp_6_timestamp: null
-dp_7_result: null
-dp_7_timestamp: null
+dp_6_result: pass: 170/170 tests + 7/7 acceptance + build OK + 6 wave receipts pass + final review pass
+dp_6_timestamp: 2026-09-16T09:12:30Z
+dp_7_result: confirmed: 全量验证通过，delta 规格已发布，审计已生成，归档就绪
+dp_7_timestamp: 2026-09-16T09:12:30Z
