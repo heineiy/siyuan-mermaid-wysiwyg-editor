@@ -1,4 +1,8 @@
 import { Plugin, Setting } from "siyuan";
+import { AdapterRegistry } from "./adapters/registry";
+import { FlowChartAdapter } from "./adapters/flowchart-adapter";
+import { ReadOnlyAdapter } from "./adapters/readonly-adapter";
+import { initEditorSession, type EditorSession } from "./controller/sync";
 import { openEditorDialog } from "./controller/dialog";
 import { registerShortcutTrigger } from "./controller/shortcut";
 import {
@@ -11,6 +15,26 @@ import {
 import { registerBlockIconTrigger } from "./controller/trigger";
 
 /**
+ * 思源内核 API 最小切片（window.siYuan 由宿主运行时注入）。
+ * 事实核实（2026-09-16）：siyuan@1.2.7 类型包仅含前端 UI 类型、不含 Kernel API
+ * 声明，此处按本插件实际调用声明最小形状；其余 API 按需补充。
+ */
+interface SiYuanKernelApi {
+  api: {
+    block: {
+      getBlockMarkdown(p: { id: string }): Promise<{ markdown: string }>;
+      updateBlock(p: { id: string; data: string }): Promise<void>;
+    };
+  };
+}
+
+declare global {
+  interface Window {
+    siYuan: SiYuanKernelApi;
+  }
+}
+
+/**
  * Mermaid 双向可视化编辑插件入口。
  *
  * 已落地：
@@ -21,16 +45,18 @@ import { registerBlockIconTrigger } from "./controller/trigger";
  * - T10：快捷键触发 + 可配置设置 —— 默认 `Shift+Alt+M`，光标位于 Mermaid
  *   代码块内触发（与 T9 走同一 Dialog 打开路径）；设置项（思源官方 Setting
  *   类）可改键，saveData 持久化、保存后立即生效（旧键失效、新键生效）。
- *
- * 后续任务：
- * - T11：在 onOpenMermaidEditor 中注入真实双向同步初始化（读取块源码 → 剥离
- *   围栏 → 组装对应图类型后端 → 挂载画布到 Dialog 容器）。
+ * - T11：双向同步协调器接线 —— onload 组装适配器注册表（FlowChartAdapter +
+ *   ReadOnlyAdapter）；打开 Dialog 后经 initEditorSession 建立正向（读块源码 →
+ *   剥离围栏 → 适配器渲染）与反向（onGraphChange → 防抖 → wrapFence → updateBlock）
+ *   闭环，Dialog 关闭（onDestroy）时 flush 未决写回并销毁会话。
  */
 export default class MermaidWysiwygEditorPlugin extends Plugin {
   private unregisterBlockIconTrigger: (() => void) | undefined;
   private unregisterShortcutTrigger: (() => void) | undefined;
   /** 当前快捷键设置（default | custom），save 后立即更新以即时生效。 */
   private shortcutSetting: ShortcutSetting = { mode: "default" };
+  /** 适配器注册表（T11 onload 组装；能力路由 route() 依此分派 full/readonly/unknown）。 */
+  private readonly registry = new AdapterRegistry();
   // 设置对话框实例由基类 Plugin.setting 承载（siyuan.d.ts:598）：
   // this.setting 赋值后思源插件列表即显示"设置"按钮（官方 plugin-sample 模式）。
 
@@ -41,6 +67,10 @@ export default class MermaidWysiwygEditorPlugin extends Plugin {
     // this 结构兼容 ShortcutStorage（Plugin 基类自带 loadData/saveData）。
     this.shortcutSetting = await loadShortcutSetting(this);
     this.setupSettingUI();
+
+    // ---- 适配器注册表（T11）：flowchart 全编辑 + 通配只读兜底 ----
+    this.registry.register(new FlowChartAdapter());
+    this.registry.register(new ReadOnlyAdapter());
 
     this.unregisterBlockIconTrigger = registerBlockIconTrigger({
       eventBus: this.eventBus,
@@ -56,22 +86,68 @@ export default class MermaidWysiwygEditorPlugin extends Plugin {
   }
 
   /**
-   * 打开编辑 Dialog（T9/T10 共享的打开路径，快捷键与 block-icon 共用）。
-   * T11 TODO：在此注入真实双向同步初始化 —— 读取块 Markdown、剥离 ```mermaid
-   * 围栏、按图类型组装 Adapter/RenderBackend、将画布挂载到 Dialog 容器，
-   * 并在 onDestroy 中销毁后端实例。
+   * 打开编辑 Dialog 并建立双向同步会话（T9/T10 共享的打开路径）。
+   * 正向流：openEditorDialog 取画布容器 → initEditorSession（getBlockMarkdown 读块
+   * 源码 → stripFence 剥离围栏 → 适配器渲染）；反向流：onGraphChange → 500ms 防抖
+   * → wrapFence 包回 → updateBlock（真实实现 window.siYuan.api.block.*）。
+   * Dialog 关闭（onDestroy）时 flush 未决写回并销毁会话。
    */
-  private openMermaidEditor(_blockId?: string): void {
-    // T9/T10 临时实现：仅打开 Dialog，画布容器即就绪（openEditorDialog 返回
-    // 句柄的 getContainer() 可取得容器节点）。
-    openEditorDialog({
+  private openMermaidEditor(blockId?: string): void {
+    if (!blockId) {
+      // 无目标块（如快捷键触发但块 id 缺失）：无法建立读写闭环，直接放弃。
+      console.warn("[siyuan-mermaid-wysiwyg-editor] 缺少 blockId，无法初始化编辑会话");
+      return;
+    }
+
+    let session: EditorSession | undefined;
+    // 会话异步初始化期间用户可能已关闭 Dialog：销毁标志防泄漏（见 init 完成分支）。
+    let dialogClosed = false;
+
+    const handle = openEditorDialog({
       title: "Mermaid 可视化编辑",
       width: "90%",
       height: "90%",
       onDestroy: () => {
-        // T11：销毁后端实例（当前无后端，空 stub）。
+        // Dialog 关闭：flush 未决写回 + 销毁会话（adapter.destroy + cancel 防抖）。
+        dialogClosed = true;
+        session?.destroy();
+        session = undefined;
       },
     });
+
+    const container = handle.getContainer();
+    if (!container) {
+      // 容器未就绪（理论不可达）：关闭 Dialog 避免悬挂。
+      handle.close();
+      return;
+    }
+
+    void initEditorSession({
+      blockId,
+      container,
+      registry: this.registry,
+      getBlockMarkdown: (id) => window.siYuan.api.block.getBlockMarkdown({ id }).then((r) => r.markdown),
+      updateBlock: (id, data) => window.siYuan.api.block.updateBlock({ id, data }),
+    }).then(
+      (s) => {
+        if (dialogClosed) {
+          // 初始化期间 Dialog 已关闭：立即销毁会话，避免画布/防抖残留泄漏。
+          s.destroy();
+          return;
+        }
+        session = s;
+      },
+      (err) => {
+        // 读取/初始化失败兜底（如 getBlockMarkdown 拒绝 / stripFence fail-fast）：
+        // 错误信息渲染进画布容器（简单错误 div；T13 完善 UI），不抛未捕获异常。
+        console.error("[siyuan-mermaid-wysiwyg-editor] 初始化编辑会话失败", err);
+        const c = handle.getContainer();
+        if (c) {
+          const message = err instanceof Error ? err.message : String(err);
+          c.innerHTML = `<div class="mermaid-wysiwyg-error">可视化编辑器加载失败：${message}</div>`;
+        }
+      }
+    );
   }
 
   /**

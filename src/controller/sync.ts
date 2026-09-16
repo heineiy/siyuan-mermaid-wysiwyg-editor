@@ -1,0 +1,194 @@
+/**
+ * 双向同步协调器（REQ-READ-001 / REQ-WRITE-001 / REQ-DEBOUNCE-001 / design.md D3/D4）。
+ *
+ * 本文件是插件「正向读取 + 反向写回」的闭环核心（T11）：
+ *
+ * 正向流（REQ-READ-001）：blockId → 注入的 getBlockMarkdown → stripFence 剥离围栏
+ * → route(code, registry) 三路路由：
+ * - full：注册表 full 适配器 init 可编辑画布（backend 由适配器缺省工厂提供）；
+ *   会话的 onGraphChange 接防抖写回通道。
+ * - readonly：已注册 readonly 适配器（无则 new ReadOnlyAdapter）只读渲染，
+ *   不建立写回通道（不调用 updateBlock）。
+ * - unknown：兜底 ReadOnlyAdapter 只读渲染 + 把提示 message 渲染进画布容器，
+ *   不建立写回通道。
+ *
+ * 反向流（REQ-WRITE-001 / REQ-DEBOUNCE-001）：onGraphChange(newCode) 绝不在回调内
+ * 同步写回——拖拽等高帧变更经 createDebounce(fn, 500) 聚合，停顿 500ms 后写回一次；
+ * 文字修改 onBlur / 关闭 Dialog 经 flushWrite() 立即写回一次。写回组装严格
+ * wrapFence(newCode)：```mermaid\n${newCode}\n``` → updateBlock(blockId, fenced)。
+ *
+ * 写回串行化：防抖天然聚合 + flush 与定时器互斥（createDebounce 保证），同一会话
+ * 的并发写回不会叠加，无需额外锁。竞态锁 isSyncing + 版本号比对属 T12 职责，
+ * 本文件只把写回函数（writeFenced）与防抖实例内聚成 seam（T12 可直接包装）。
+ *
+ * 错误处理（本任务最小处理，T13 完善 UI）：backend init 拒绝（如 VisimerLoadError）
+ * 不抛未捕获异常，错误 message 渲染进画布容器（一个简单错误 div）。
+ *
+ * 会话生命周期：destroy() = flush 未决写回 + adapter.destroy + cancel 防抖，幂等；
+ * destroy 后 onGraphChange / flushWrite 不再触发写回。
+ */
+
+import { createDebounce } from "./debounce";
+import { stripFence, wrapFence } from "../utils/fence";
+import { route } from "../adapters/router";
+import { ReadOnlyAdapter } from "../adapters/readonly-adapter";
+import type { AdapterRegistry } from "../adapters/registry";
+
+/** initEditorSession 注入项（真实实现由 src/index.ts 接 window.siYuan 内核 API）。 */
+export interface InitEditorSessionOptions {
+  /** 目标代码块 id（读写均以此定位）。 */
+  blockId: string;
+  /** 画布挂载容器（由 Dialog 提供，T8）。 */
+  container: HTMLElement;
+  /** 适配器注册表（onload 组装：FlowChartAdapter + ReadOnlyAdapter）。 */
+  registry: AdapterRegistry;
+  /** 读取块 Markdown（真实实现：window.siYuan.api.block.getBlockMarkdown）。 */
+  getBlockMarkdown: (blockId: string) => Promise<string> | string;
+  /** 写回块源码（真实实现：window.siYuan.api.block.updateBlock）。 */
+  updateBlock: (blockId: string, fencedMarkdown: string) => Promise<void> | void;
+  /** 反向流防抖窗口（REQ-DEBOUNCE-001：至多 debounceMs 内写回一次；缺省 500）。 */
+  debounceMs?: number;
+}
+
+/** 编辑会话句柄：调用方（Dialog onDestroy / onBlur）驱动写回与销毁。 */
+export interface EditorSession {
+  /** 立即写回未决变更一次（onBlur / 关闭 Dialog 场景；无未决时零副作用）。 */
+  flushWrite(): void;
+  /** 销毁会话：flush 未决写回 + adapter.destroy + cancel 防抖；幂等。 */
+  destroy(): void;
+}
+
+/** 缺省防抖窗口（REQ-DEBOUNCE-001：500ms）。 */
+const DEFAULT_DEBOUNCE_MS = 500;
+
+/** 错误提示 div 的 class（T13 将完善为正式错误 UI）。 */
+const ERROR_DIV_CLASS = "mermaid-wysiwyg-error";
+/** unknown 类型提示 div 的 class。 */
+const HINT_DIV_CLASS = "mermaid-wysiwyg-hint";
+
+/** readonly/unknown 会话的 noop onGraphChange：只读路径禁止任何编辑回调。 */
+const noopOnGraphChange = (_newCode: string): void => {};
+
+/** 把 message 渲染进画布容器（简单 div；T13 将完善为正式 UI）。 */
+function renderMessage(container: HTMLElement, text: string, className: string): void {
+  const div = document.createElement("div");
+  div.className = className;
+  div.textContent = text;
+  container.appendChild(div);
+}
+
+const errorText = (err: unknown): string => (err instanceof Error ? err.message : String(err));
+
+/**
+ * 初始化编辑会话（正向流）并装配反向流写回通道。
+ * @throws 仅当 getBlockMarkdown 失败或输入非 mermaid 围栏块（stripFence fail-fast，
+ *   T2 契约）；调用方（index.ts）负责兜底展示。
+ */
+export async function initEditorSession(opts: InitEditorSessionOptions): Promise<EditorSession> {
+  const { blockId, container, registry, updateBlock } = opts;
+  const debounceMs = opts.debounceMs ?? DEFAULT_DEBOUNCE_MS;
+
+  // ---- 正向流（REQ-READ-001）：读块源码 → 剥离围栏 → 能力路由 ----
+  const markdown = await opts.getBlockMarkdown(blockId);
+  const code = stripFence(markdown);
+  const result = route(code, registry);
+
+  // 会话级销毁标志：destroy 后 onGraphChange / flushWrite 一律失效（幂等 + 防泄漏）。
+  let destroyed = false;
+
+  switch (result.kind) {
+    case "full": {
+      const adapter = result.adapter;
+
+      // ---- 反向流（REQ-WRITE-001 / REQ-DEBOUNCE-001）：防抖写回通道 ----
+      // 写回函数 seam（T12 在此包装 isSyncing 竞态锁 + 版本号比对）。
+      const writeFenced = (newCode: string): void => {
+        void updateBlock(blockId, wrapFence(newCode));
+      };
+      const writeDebounce = createDebounce(writeFenced, debounceMs);
+      const onGraphChange = (newCode: string): void => {
+        if (destroyed) {
+          return; // 会话已销毁：不再聚合新的写回
+        }
+        writeDebounce.call(newCode);
+      };
+
+      // backend init 拒绝（如 VisimerLoadError）：最小处理——不抛未捕获异常，
+      // 错误 message 渲染进画布容器（一个简单错误 div；T13 完善 UI）。
+      try {
+        // Promise.resolve 吸收同步抛错与拒绝的 Promise 两种形态。
+        await Promise.resolve(adapter.init(code, { container, onGraphChange }));
+      } catch (err) {
+        renderMessage(container, `可视化编辑器加载失败：${errorText(err)}`, ERROR_DIV_CLASS);
+      }
+
+      return {
+        flushWrite(): void {
+          if (destroyed) {
+            return;
+          }
+          // onBlur / 关闭场景：立即写回未决变更一次（REQ-WRITE-001 场景 2）。
+          writeDebounce.flush();
+        },
+        destroy(): void {
+          if (destroyed) {
+            return;
+          }
+          destroyed = true;
+          // 关闭 Dialog：先 flush 未决写回（立即写回一次），再销毁画布，最后清理防抖定时器。
+          writeDebounce.flush();
+          adapter.destroy();
+          writeDebounce.cancel();
+        },
+      };
+    }
+
+    case "readonly": {
+      // 已注册 readonly 适配器优先；无则 new ReadOnlyAdapter 兜底只读渲染。
+      const adapter = result.adapter ?? new ReadOnlyAdapter();
+      try {
+        await Promise.resolve(adapter.init(code, { container, onGraphChange: noopOnGraphChange }));
+      } catch (err) {
+        renderMessage(container, `只读预览加载失败：${errorText(err)}`, ERROR_DIV_CLASS);
+      }
+
+      return {
+        // 只读会话无写回通道：flush 零副作用（不调用 updateBlock）。
+        flushWrite(): void {},
+        destroy(): void {
+          if (destroyed) {
+            return;
+          }
+          destroyed = true;
+          adapter.destroy();
+        },
+      };
+    }
+
+    case "unknown": {
+      // 兜底只读渲染 + 提示文案（REQ-DEGRADE-001：未知类型暂不支持可视化编辑）。
+      const fallback = new ReadOnlyAdapter();
+      try {
+        await Promise.resolve(
+          fallback.init(code, { container, onGraphChange: noopOnGraphChange })
+        );
+      } catch {
+        // 兜底渲染自身经 onError 吞错（T7 契约）；此处双保险，不抛未捕获异常。
+      }
+      // 提示文案渲染进画布容器：在只读渲染完成后追加，避免被渲染产物 innerHTML 覆盖。
+      renderMessage(container, result.message, HINT_DIV_CLASS);
+
+      return {
+        // unknown 会话无写回通道：flush 零副作用（不调用 updateBlock）。
+        flushWrite(): void {},
+        destroy(): void {
+          if (destroyed) {
+            return;
+          }
+          destroyed = true;
+          fallback.destroy();
+        },
+      };
+    }
+  }
+}

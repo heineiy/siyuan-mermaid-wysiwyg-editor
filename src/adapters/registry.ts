@@ -24,8 +24,12 @@ import type { RenderBackend } from "../render/backend";
 export interface AdapterOptions {
   /** 画布挂载容器（由 Dialog 提供，T8 组装）。 */
   container: HTMLElement;
-  /** 渲染后端实例（接口级依赖，不绑定具体实现；T6 组装时注入）。 */
-  backend: RenderBackend;
+  /**
+   * 渲染后端实例（接口级依赖，不绑定具体实现；T6 组装时注入）。
+   * 可选：缺省时由适配器自带工厂提供（D5 语义——T11 协调器按「backend 由
+   * adapter 缺省工厂提供」调用，如 FlowChartAdapter `opts.backend ?? factory.create()`）。
+   */
+  backend?: RenderBackend;
   /** 用户在画布中编辑完成后回调新代码（REQ-RENDER-001 反向流）。 */
   onGraphChange: (newCode: string) => void;
 }
