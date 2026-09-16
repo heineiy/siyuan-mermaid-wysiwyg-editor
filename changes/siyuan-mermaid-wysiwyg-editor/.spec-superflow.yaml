@@ -2,18 +2,18 @@
 # Derived data. Always rebuildable from artifacts. Lost/corrupt → fall back to content-level detection.
 
 # === Core state ===
-state: exploring
-workflow: auto
-revision: null
+state: executing
+workflow: full
+revision: 1
 
 # === Hashes (fast staleness detection) ===
-artifacts_hash: null
-contract_hash: null
+artifacts_hash: sha256:c8f2a42e8fdb06fb2667f5494096ea284f2e39ea0dcf122a30005257ea793ba4
+contract_hash: sha256:cf7cabe0fa21459fd525807f7fe00ca8d51cbf6393942b9664c5f7ef83f225d3
 
 # === Execution progress ===
-execution_mode: null
-execution_plan_hash: null
-execution_plan_revision: null
+execution_mode: sdd
+execution_plan_hash: sha256:6e38e4dd25326e521ba0e568083a64fd44fe1a45c2a2855ce4ed78f4c4f1c9e4
+execution_plan_revision: 1
 batches_completed: 0
 test_result: null
 spec_merged: false
@@ -21,23 +21,23 @@ spec_publication_receipt: null
 
 # === Metadata ===
 change_name: siyuan-mermaid-wysiwyg-editor
-last_transition: 2026-09-16T06:13:05.156Z
-last_transition_from: null
-last_transition_to: null
+last_transition: 2026-09-16T06:43:06.443Z
+last_transition_from: approved-for-build
+last_transition_to: executing
 
 # === Decision points ===
-dp_0_decisions: null
-dp_0_result: null
-dp_0_confirmed: null
-dp_0_timestamp: null
+dp_0_decisions: change_name=siyuan-mermaid-wysiwyg-editor; intent=构建思源笔记Mermaid代码块双向WYSIWYG可视化编辑插件(flowchart全编辑+其它图类型降级只读+§8兼容扩展层); constraints=100%兼容思源原生Markdown存储(卸载零损坏),拖拽高频不落盘(500ms防抖+onDragEnd flush),不重写思源渲染引擎,以设计文档v1.0为基线; scope=含§8兼容扩展; communication=逐项询问; artifact_language=zh-CN; workflow_path=full
+dp_0_result: confirmed
+dp_0_confirmed: true
+dp_0_timestamp: 2026-09-16T06:18:36Z
 dp_1_result: null
 dp_1_timestamp: null
-dp_2_result: null
-dp_2_timestamp: null
-dp_3_result: null
-dp_3_timestamp: null
-dp_4_result: null
-dp_4_timestamp: null
+dp_2_result: approved: proposal/specs(14需求)/design(6决策)/tasks(14任务) 整体批准
+dp_2_timestamp: 2026-09-16T06:38:17Z
+dp_3_result: approved: 执行契约批准(6 wave/14任务/14需求全映射)
+dp_3_timestamp: 2026-09-16T06:40:45Z
+dp_4_result: sdd: plan revision 1; user-confirmed; 用户确认 sdd 执行模式（与推荐一致）
+dp_4_timestamp: 2026-09-16T06:42:54.960Z
 dp_5_result: null
 dp_5_timestamp: null
 dp_5_decisions: null

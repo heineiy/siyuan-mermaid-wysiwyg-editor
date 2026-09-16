@@ -1,0 +1,201 @@
+{
+  "mode": "sdd",
+  "source": "user-confirmed",
+  "rationale": "用户确认 sdd 执行模式（与推荐一致）",
+  "waves": [
+    {
+      "id": "w1-foundation",
+      "strategy": "parallel",
+      "tasks": [
+        "T1",
+        "T2",
+        "T3",
+        "T4"
+      ],
+      "depends_on": []
+    },
+    {
+      "id": "w2-adapter-layer",
+      "strategy": "parallel",
+      "tasks": [
+        "T5",
+        "T8"
+      ],
+      "depends_on": [
+        "w1-foundation"
+      ]
+    },
+    {
+      "id": "w3-adapters-triggers",
+      "strategy": "parallel",
+      "tasks": [
+        "T6",
+        "T7",
+        "T9",
+        "T10"
+      ],
+      "depends_on": [
+        "w2-adapter-layer"
+      ]
+    },
+    {
+      "id": "w4-sync-core",
+      "strategy": "serial",
+      "tasks": [
+        "T11"
+      ],
+      "depends_on": [
+        "w3-adapters-triggers"
+      ]
+    },
+    {
+      "id": "w5-race-error",
+      "strategy": "parallel",
+      "tasks": [
+        "T12",
+        "T13"
+      ],
+      "depends_on": [
+        "w4-sync-core"
+      ]
+    },
+    {
+      "id": "w6-acceptance",
+      "strategy": "serial",
+      "tasks": [
+        "T14"
+      ],
+      "depends_on": [
+        "w5-race-error"
+      ]
+    }
+  ],
+  "artifacts_hash": "sha256:c8f2a42e8fdb06fb2667f5494096ea284f2e39ea0dcf122a30005257ea793ba4",
+  "contract_hash": "sha256:cf7cabe0fa21459fd525807f7fe00ca8d51cbf6393942b9664c5f7ef83f225d3",
+  "workflow": "full",
+  "revision": 1,
+  "recommendation": {
+    "available_modes": [
+      "inline",
+      "batch-inline",
+      "sdd"
+    ],
+    "recommendation": {
+      "mode": "sdd",
+      "reasons": [
+        "The declared execution waves include parallel work, which SDD can dispatch and review independently."
+      ]
+    },
+    "facts": {
+      "workflow": "full",
+      "documented_task_count": 14,
+      "planned_task_count": 14,
+      "planned_wave_count": 6,
+      "has_parallel_wave": true,
+      "inline_threshold": 3
+    }
+  },
+  "recommendation_receipt": {
+    "recommendation": {
+      "available_modes": [
+        "inline",
+        "batch-inline",
+        "sdd"
+      ],
+      "recommendation": {
+        "mode": "sdd",
+        "reasons": [
+          "The declared execution waves include parallel work, which SDD can dispatch and review independently."
+        ]
+      },
+      "facts": {
+        "workflow": "full",
+        "documented_task_count": 14,
+        "planned_task_count": 14,
+        "planned_wave_count": 6,
+        "has_parallel_wave": true,
+        "inline_threshold": 3
+      }
+    },
+    "waves": [
+      {
+        "id": "w1-foundation",
+        "strategy": "parallel",
+        "tasks": [
+          "T1",
+          "T2",
+          "T3",
+          "T4"
+        ],
+        "depends_on": []
+      },
+      {
+        "id": "w2-adapter-layer",
+        "strategy": "parallel",
+        "tasks": [
+          "T5",
+          "T8"
+        ],
+        "depends_on": [
+          "w1-foundation"
+        ]
+      },
+      {
+        "id": "w3-adapters-triggers",
+        "strategy": "parallel",
+        "tasks": [
+          "T6",
+          "T7",
+          "T9",
+          "T10"
+        ],
+        "depends_on": [
+          "w2-adapter-layer"
+        ]
+      },
+      {
+        "id": "w4-sync-core",
+        "strategy": "serial",
+        "tasks": [
+          "T11"
+        ],
+        "depends_on": [
+          "w3-adapters-triggers"
+        ]
+      },
+      {
+        "id": "w5-race-error",
+        "strategy": "parallel",
+        "tasks": [
+          "T12",
+          "T13"
+        ],
+        "depends_on": [
+          "w4-sync-core"
+        ]
+      },
+      {
+        "id": "w6-acceptance",
+        "strategy": "serial",
+        "tasks": [
+          "T14"
+        ],
+        "depends_on": [
+          "w5-race-error"
+        ]
+      }
+    ],
+    "artifacts_hash": "sha256:c8f2a42e8fdb06fb2667f5494096ea284f2e39ea0dcf122a30005257ea793ba4",
+    "contract_hash": "sha256:cf7cabe0fa21459fd525807f7fe00ca8d51cbf6393942b9664c5f7ef83f225d3",
+    "workflow": "full",
+    "execution_plan_revision_at_recommendation": null,
+    "created_at": "2026-09-16T06:41:11.573Z",
+    "hash": "sha256:4a22941b2cf2c1c539c3f00911c8309491597a803e04b44a90062045d6adb20c"
+  },
+  "selection": {
+    "confirmed": true,
+    "followed_recommendation": true,
+    "acknowledged_non_recommendation": false
+  },
+  "hash": "sha256:6e38e4dd25326e521ba0e568083a64fd44fe1a45c2a2855ce4ed78f4c4f1c9e4"
+}

@@ -1,0 +1,60 @@
+{
+  "schema_version": 2,
+  "available_modes": [
+    "full",
+    "hotfix",
+    "tweak",
+    "quick",
+    "lightweight"
+  ],
+  "facts": {
+    "task_count": 12,
+    "file_count": 16,
+    "config_doc_only": "no",
+    "schema_api_change": "no",
+    "new_module": "yes",
+    "behavioral_constraint_change": "no",
+    "cross_module_change": "no",
+    "uncertainty": "low",
+    "request_kind": "standard",
+    "affected_paths": null,
+    "exclusion_checks": {
+      "production_behavior": "unknown",
+      "public_boundary": "unknown",
+      "installer": "unknown",
+      "state_machine": "unknown",
+      "external_side_effect": "unknown",
+      "data_permission_config_semantics": "unknown",
+      "expected_behavior_clear": "unknown",
+      "verification_reproducible": "unknown",
+      "impact_paths_complete": "unknown"
+    }
+  },
+  "missing_facts": [],
+  "status": "ready",
+  "recommendation": {
+    "mode": "full",
+    "reasons": [
+      "Risk signals require the user to choose Quick or Full."
+    ],
+    "risk_reasons": [
+      "new module"
+    ]
+  },
+  "created_at": "2026-09-16T06:16:58.235Z",
+  "selection": {
+    "mode": "full",
+    "reason": "全新插件模块：思源 Mermaid 双向可视化编辑插件，范围含 §8 兼容扩展层",
+    "followed_recommendation": true,
+    "acknowledged_non_recommendation": false,
+    "accepted_automatically": false,
+    "risk_override": false,
+    "verification_strategy": null,
+    "scope_confirmation": null,
+    "verification_result": null,
+    "escalation_reason": null,
+    "confirmed_at": "2026-09-16T06:18:21.440Z",
+    "selected_at": "2026-09-16T06:18:21.440Z"
+  },
+  "hash": "sha256:cf87adc5c06c0158271295927a3fae45aa1394aff9109ea5bd8b5b151bb4910f"
+}
