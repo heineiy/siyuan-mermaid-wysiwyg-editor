@@ -1,0 +1,44 @@
+{
+  "name": "siyuan-mermaid-wysiwyg-editor",
+  "author": "mermaid-wysiwyg",
+  "url": "https://github.com/siyuan-mermaid-wysiwyg-editor/siyuan-mermaid-wysiwyg-editor",
+  "version": "0.1.0",
+  "minAppVersion": "2.10.0",
+  "displayName": {
+    "default": "Mermaid 双向可视化编辑",
+    "zh_CN": "Mermaid 双向可视化编辑"
+  },
+  "description": {
+    "default": "Mermaid code block bidirectional WYSIWYG editor for SiYuan: drag nodes, edit text on canvas, and write back to the native markdown block.",
+    "zh_CN": "思源笔记 Mermaid 代码块双向可视化编辑：画布拖拽节点、双击改字，写回原生 Markdown 块，存储零失真。"
+  },
+  "readme": {
+    "default": "README.md",
+    "zh_CN": "README_zh_CN.md"
+  },
+  "funding": {
+    "openCollective": "",
+    "patreon": "",
+    "github": "",
+    "custom": []
+  },
+  "keywords": [
+    "siyuan",
+    "mermaid",
+    "wysiwyg",
+    "visual-editor"
+  ],
+  "platforms": [
+    "desktop",
+    "android",
+    "ios"
+  ],
+  "isOfficial": false,
+  "isMobile": true,
+  "scripts": [
+    {
+      "method": "index",
+      "label": "入口"
+    }
+  ]
+}

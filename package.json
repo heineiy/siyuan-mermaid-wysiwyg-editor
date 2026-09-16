@@ -1,0 +1,28 @@
+{
+  "name": "siyuan-mermaid-wysiwyg-editor",
+  "version": "0.1.0",
+  "description": "思源笔记 Mermaid 代码块双向可视化编辑插件（block-icon / 快捷键触发，Dialog 承载画布，围栏剥离与包回写回，原生 Markdown 存储零失真）",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "vite build",
+    "dev": "vite build --watch",
+    "test": "vitest run"
+  },
+  "keywords": [
+    "siyuan",
+    "mermaid",
+    "wysiwyg",
+    "plugin",
+    "visual-editor"
+  ],
+  "author": "mermaid-wysiwyg",
+  "license": "MIT",
+  "dependencies": {
+    "siyuan": "1.2.7"
+  },
+  "devDependencies": {
+    "typescript": "^6.0.3",
+    "vite": "^7.0.0",
+    "vitest": "^5.0.1"
+  }
+}
