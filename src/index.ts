@@ -1,4 +1,4 @@
-import { Plugin, Setting } from "siyuan";
+import { Plugin, Setting, fetchSyncPost } from "siyuan";
 import { AdapterRegistry } from "./adapters/registry";
 import { FlowChartAdapter } from "./adapters/flowchart-adapter";
 import { ReadOnlyAdapter } from "./adapters/readonly-adapter";
@@ -15,22 +15,26 @@ import {
 import { registerBlockIconTrigger } from "./controller/trigger";
 
 /**
- * 思源内核 API 最小切片（window.siYuan 由宿主运行时注入）。
- * 事实核实（2026-09-16）：siyuan@1.2.7 类型包仅含前端 UI 类型、不含 Kernel API
- * 声明，此处按本插件实际调用声明最小形状；其余 API 按需补充。
+ * 思源内核 API 最小封装（fetchSyncPost 由 siyuan 包运行时导出，siyuan.d.ts:401；
+ * 生产验证模式来自参考插件 siyuan-plugin-task-note-management v7.1.1）。
+ * 注意：window.siyuan 上没有 api 通道（3.8.3 前端源码核实），内核 API 统一走
+ * fetchSyncPost('/api/...')，返回 { code, msg, data }，code===0 为成功。
  */
-interface SiYuanKernelApi {
-  api: {
-    block: {
-      getBlockMarkdown(p: { id: string }): Promise<{ markdown: string }>;
-      updateBlock(p: { id: string; data: string }): Promise<void>;
-    };
-  };
+
+/** 读取代码块的 Markdown 源码（POST /api/block/getBlockMarkdown → data 为 markdown 字符串）。 */
+async function fetchBlockMarkdown(id: string): Promise<string> {
+  const res = await fetchSyncPost("/api/block/getBlockMarkdown", { id });
+  if (res.code !== 0) {
+    throw new Error(`getBlockMarkdown 失败: ${res.msg}`);
+  }
+  return res.data as string;
 }
 
-declare global {
-  interface Window {
-    siYuan: SiYuanKernelApi;
+/** 写回代码块源码（POST /api/block/updateBlock，dataType=markdown）。 */
+async function fetchUpdateBlock(id: string, data: string): Promise<void> {
+  const res = await fetchSyncPost("/api/block/updateBlock", { id, data, dataType: "markdown" });
+  if (res.code !== 0) {
+    throw new Error(`updateBlock 失败: ${res.msg}`);
   }
 }
 
@@ -89,7 +93,7 @@ export default class MermaidWysiwygEditorPlugin extends Plugin {
    * 打开编辑 Dialog 并建立双向同步会话（T9/T10 共享的打开路径）。
    * 正向流：openEditorDialog 取画布容器 → initEditorSession（getBlockMarkdown 读块
    * 源码 → stripFence 剥离围栏 → 适配器渲染）；反向流：onGraphChange → 500ms 防抖
-   * → wrapFence 包回 → updateBlock（真实实现 window.siYuan.api.block.*）。
+   * → wrapFence 包回 → updateBlock（真实实现 window.siyuan.api.block.*，小写 siyuan）。
    * Dialog 关闭（onDestroy）时 flush 未决写回并销毁会话。
    */
   private openMermaidEditor(blockId?: string): void {
@@ -126,8 +130,8 @@ export default class MermaidWysiwygEditorPlugin extends Plugin {
       blockId,
       container,
       registry: this.registry,
-      getBlockMarkdown: (id) => window.siYuan.api.block.getBlockMarkdown({ id }).then((r) => r.markdown),
-      updateBlock: (id, data) => window.siYuan.api.block.updateBlock({ id, data }),
+      getBlockMarkdown: (id) => fetchBlockMarkdown(id),
+      updateBlock: (id, data) => fetchUpdateBlock(id, data),
     }).then(
       (s) => {
         if (dialogClosed) {

@@ -38,7 +38,7 @@ import { route } from "../adapters/router";
 import { ReadOnlyAdapter } from "../adapters/readonly-adapter";
 import type { AdapterRegistry } from "../adapters/registry";
 
-/** initEditorSession 注入项（真实实现由 src/index.ts 接 window.siYuan 内核 API）。 */
+/** initEditorSession 注入项（真实实现由 src/index.ts 接 window.siyuan 内核 API）。 */
 export interface InitEditorSessionOptions {
   /** 目标代码块 id（读写均以此定位）。 */
   blockId: string;
@@ -46,9 +46,9 @@ export interface InitEditorSessionOptions {
   container: HTMLElement;
   /** 适配器注册表（onload 组装：FlowChartAdapter + ReadOnlyAdapter）。 */
   registry: AdapterRegistry;
-  /** 读取块 Markdown（真实实现：window.siYuan.api.block.getBlockMarkdown）。 */
+  /** 读取块 Markdown（真实实现：window.siyuan.api.block.getBlockMarkdown）。 */
   getBlockMarkdown: (blockId: string) => Promise<string> | string;
-  /** 写回块源码（真实实现：window.siYuan.api.block.updateBlock）。 */
+  /** 写回块源码（真实实现：window.siyuan.api.block.updateBlock）。 */
   updateBlock: (blockId: string, fencedMarkdown: string) => Promise<void> | void;
   /** 反向流防抖窗口（REQ-DEBOUNCE-001：至多 debounceMs 内写回一次；缺省 500）。 */
   debounceMs?: number;

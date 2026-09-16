@@ -37,6 +37,13 @@ export default defineConfig({
       // SiYuan 前端加载器以 CommonJS 包装（eval + require shim）执行插件入口，
       // 因此产物必须为 CJS 并在运行时 require("siyuan")（对应官方 webpack 的 commonjs2 + externals）。
       external: ["siyuan"],
+      output: {
+        // 思源加载器按 esModule interop 取 module.default 实例化插件类
+        // （生产验证：参考插件 bundle 尾部 exports.default = PluginClass + __esModule）。
+        // rollup 对 default-only 入口缺省输出 module.exports = Class（无 .default），
+        // 会导致加载器取到 undefined、插件从未实例化——必须显式 named。
+        exports: "named",
+      },
     },
   },
   plugins: [copyPluginJson()],
