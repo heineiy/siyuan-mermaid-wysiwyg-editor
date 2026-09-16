@@ -1,0 +1,48 @@
+# .spec-superflow.yaml — lightweight state machine
+# Derived data. Always rebuildable from artifacts. Lost/corrupt → fall back to content-level detection.
+
+# === Core state ===
+state: exploring
+workflow: auto
+revision: null
+
+# === Hashes (fast staleness detection) ===
+artifacts_hash: null
+contract_hash: null
+
+# === Execution progress ===
+execution_mode: null
+execution_plan_hash: null
+execution_plan_revision: null
+batches_completed: 0
+test_result: null
+spec_merged: false
+spec_publication_receipt: null
+
+# === Metadata ===
+change_name: siyuan-mermaid-wysiwyg-editor
+last_transition: 2026-09-16T06:13:05.156Z
+last_transition_from: null
+last_transition_to: null
+
+# === Decision points ===
+dp_0_decisions: null
+dp_0_result: null
+dp_0_confirmed: null
+dp_0_timestamp: null
+dp_1_result: null
+dp_1_timestamp: null
+dp_2_result: null
+dp_2_timestamp: null
+dp_3_result: null
+dp_3_timestamp: null
+dp_4_result: null
+dp_4_timestamp: null
+dp_5_result: null
+dp_5_timestamp: null
+dp_5_decisions: null
+dp_5_confirmed: null
+dp_6_result: null
+dp_6_timestamp: null
+dp_7_result: null
+dp_7_timestamp: null
