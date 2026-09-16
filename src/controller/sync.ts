@@ -100,16 +100,53 @@ export async function initEditorSession(opts: InitEditorSessionOptions): Promise
     case "full": {
       const adapter = result.adapter;
 
-      // ---- 反向流（REQ-WRITE-001 / REQ-DEBOUNCE-001）：防抖写回通道 ----
-      // 写回函数 seam（T12 在此包装 isSyncing 竞态锁 + 版本号比对）。
+      // ---- 反向流（REQ-WRITE-001 / REQ-DEBOUNCE-001 / REQ-RACE-001）：防抖写回通道 ----
+      // 竞态防护（T12 / D4）：isSyncing 写回锁 + 编辑版本号比对，防止
+      // "读回旧文本覆盖新编辑"——旧回调被新编辑取代时绝不写入。
+      // 每次 onGraphChange 递增：新编辑意味着旧回调已过期。
+      let editVersion = 0;
+      // updateBlock 进行中置 true：锁内到达的写回不并发执行（思源内核并发写同块
+      // 不保证顺序），记 pendingCode 由当前写回完成后补写。
+      let isSyncing = false;
+      // 锁内到达的最新代码：写回完成后立即补写（绝不丢弃最后一次编辑）。
+      let pendingCode: string | null = null;
+
       const writeFenced = (newCode: string): void => {
-        void updateBlock(blockId, wrapFence(newCode));
+        if (isSyncing) {
+          // 锁内到达的写回：不并发执行第二个 updateBlock，记 pending 由当前写回
+          // 完成后补写（pendingCode 只存最新到达者，防抖已保证其为最新内容）。
+          pendingCode = newCode;
+          return;
+        }
+        // 版本快照 v：本次写回触发时的编辑版本号。
+        const versionAtTrigger = editVersion;
+        isSyncing = true;
+        const fenced = wrapFence(newCode);
+        const complete = (): void => {
+          isSyncing = false;
+          // 版本号比对（REQ-RACE-001）：写回期间若有新编辑（editVersion > v），
+          // 旧结果不得"收尾"——只允许补写锁内到达的最新版本（pendingCode），
+          // 否则留给下一次防抖/flush 周期；绝不把旧版本当最终态覆盖新编辑。
+          if (editVersion > versionAtTrigger && pendingCode !== null) {
+            const latest = pendingCode;
+            pendingCode = null;
+            writeFenced(latest);
+          }
+        };
+        try {
+          // Promise.resolve 吸收同步返回与异步 Promise 两种形态；then 双参统一
+          // 成功/拒绝两条路径（拒绝侧只释放锁 + 补写 pending，UI 报错属 T13）。
+          void Promise.resolve(updateBlock(blockId, fenced)).then(complete, complete);
+        } catch {
+          complete(); // 同步抛错兜底：释放锁，不卡死会话（T13 完善错误处理）。
+        }
       };
       const writeDebounce = createDebounce(writeFenced, debounceMs);
       const onGraphChange = (newCode: string): void => {
         if (destroyed) {
           return; // 会话已销毁：不再聚合新的写回
         }
+        editVersion += 1; // 每次编辑递增版本号：后续写回完成时据此识别"期间有新编辑"
         writeDebounce.call(newCode);
       };
 
