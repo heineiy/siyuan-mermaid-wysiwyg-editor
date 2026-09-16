@@ -43,5 +43,9 @@ export default defineConfig({
   test: {
     environment: "node",
     include: ["src/**/*.test.ts"],
+    // siyuan 为纯类型声明包（exports 仅含 types 条件、无运行时入口），测试
+    // 环境以别名指向占位模块使 vi.mock("siyuan") 的解析可成功；生产构建
+    // 不受影响（rollupOptions.external 保持运行时 require("siyuan")）。
+    alias: { siyuan: resolve("src/test-utils/siyuan.ts") },
   },
 });
