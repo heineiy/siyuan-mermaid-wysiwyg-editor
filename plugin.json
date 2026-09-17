@@ -2,31 +2,11 @@
   "name": "siyuan-mermaid-wysiwyg-editor",
   "author": "heiney",
   "url": "https://github.com/heineiy/siyuan-mermaid-wysiwyg-editor",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "minAppVersion": "3.8.0",
-  "kernels": [
-    "windows",
-    "linux",
-    "darwin",
-    "ios",
-    "android",
-    "harmony",
-    "all"
-  ],
-  "backends": [
-    "windows",
-    "linux",
-    "darwin",
-    "ios",
-    "android",
-    "harmony",
-    "all"
-  ],
-  "frontends": [
-    "desktop",
-    "mobile",
-    "all"
-  ],
+  "kernels": ["all"],
+  "backends": ["all"],
+  "frontends": ["all"],
   "displayName": {
     "default": "Mermaid WYSIWYG Editor",
     "zh-CN": "Mermaid 双向可视化编辑"
