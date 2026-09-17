@@ -13,21 +13,27 @@ import {
   type ShortcutSetting,
 } from "./controller/settings";
 import { registerBlockIconTrigger } from "./controller/trigger";
+import { stripKramdownIal } from "./utils/fence";
 
 /**
  * 思源内核 API 最小封装（fetchSyncPost 由 siyuan 包运行时导出，siyuan.d.ts:401；
  * 生产验证模式来自参考插件 siyuan-plugin-task-note-management v7.1.1）。
- * 注意：window.siyuan 上没有 api 通道（3.8.3 前端源码核实），内核 API 统一走
+ * 注意：window.siyuan 上没有 api 通道，内核 API 统一走
  * fetchSyncPost('/api/...')，返回 { code, msg, data }，code===0 为成功。
  */
 
-/** 读取代码块的 Markdown 源码（POST /api/block/getBlockMarkdown → data 为 markdown 字符串）。 */
+/**
+ * 读取代码块的 Markdown 源码。
+ * 内核没有 /api/block/getBlockMarkdown 端点（3.8.3 实测 404）；
+ * 正确端点是 POST /api/block/getBlockKramdown → data.kramdown，
+ * 其尾部携带块级 IAL（{: id=... updated=...}），剥离后得到纯 markdown。
+ */
 async function fetchBlockMarkdown(id: string): Promise<string> {
-  const res = await fetchSyncPost("/api/block/getBlockMarkdown", { id });
+  const res = await fetchSyncPost("/api/block/getBlockKramdown", { id });
   if (res.code !== 0) {
-    throw new Error(`getBlockMarkdown 失败: ${res.msg}`);
+    throw new Error(`getBlockKramdown 失败: ${res.msg}`);
   }
-  return res.data as string;
+  return stripKramdownIal((res.data as { kramdown: string }).kramdown);
 }
 
 /** 写回代码块源码（POST /api/block/updateBlock，dataType=markdown）。 */

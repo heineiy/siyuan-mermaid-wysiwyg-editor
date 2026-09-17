@@ -43,6 +43,11 @@ export default defineConfig({
         // rollup 对 default-only 入口缺省输出 module.exports = Class（无 .default），
         // 会导致加载器取到 undefined、插件从未实例化——必须显式 named。
         exports: "named",
+        // 思源插件必须是单文件入口：加载器的 require shim 只提供 'siyuan' 等模块名映射，
+        // 不解析相对路径 require('./chunk-xxx.js')（生产验证：drawio / copyAsImage /
+        // task-note-management 等正常插件全部为单 index.js）。mermaid 内部按图类型
+        // 动态 import，缺省会拆出 60+ chunk 导致入口加载失败——必须全部内联。
+        inlineDynamicImports: true,
       },
     },
   },
