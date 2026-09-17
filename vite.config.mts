@@ -6,6 +6,7 @@ import { resolve } from "node:path";
 /**
  * 将 plugin.json（思源插件清单）复制到构建产物根目录。
  * SiYuan 插件目录要求同时包含 plugin.json 与入口 JS（index.js）。
+ * GitHub Release 中的 package.zip 解压后根目录须有这两个文件。
  */
 const copyPluginJson = (): Plugin => {
   let outDir = "dist";
@@ -25,6 +26,8 @@ const copyPluginJson = (): Plugin => {
 
 export default defineConfig({
   build: {
+    outDir: "dist",
+    emptyOutDir: true,
     minify: false,
     sourcemap: false,
     target: "esnext",

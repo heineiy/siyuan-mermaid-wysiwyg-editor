@@ -1,21 +1,46 @@
 {
   "name": "siyuan-mermaid-wysiwyg-editor",
-  "author": "mermaid-wysiwyg",
-  "url": "https://github.com/siyuan-mermaid-wysiwyg-editor/siyuan-mermaid-wysiwyg-editor",
-  "version": "0.1.0",
-  "minAppVersion": "2.10.0",
+  "author": "heiney",
+  "url": "https://github.com/heineiy/siyuan-mermaid-wysiwyg-editor",
+  "version": "0.2.0",
+  "minAppVersion": "3.8.0",
+  "kernels": [
+    "windows",
+    "linux",
+    "darwin",
+    "ios",
+    "android",
+    "harmony",
+    "all"
+  ],
+  "backends": [
+    "windows",
+    "linux",
+    "darwin",
+    "ios",
+    "android",
+    "harmony",
+    "all"
+  ],
+  "frontends": [
+    "desktop",
+    "mobile",
+    "all"
+  ],
   "displayName": {
-    "default": "Mermaid 双向可视化编辑",
-    "zh_CN": "Mermaid 双向可视化编辑"
+    "default": "Mermaid WYSIWYG Editor",
+    "zh-CN": "Mermaid 双向可视化编辑"
   },
   "description": {
-    "default": "Mermaid code block bidirectional WYSIWYG editor for SiYuan: drag nodes, edit text on canvas, and write back to the native markdown block.",
-    "zh_CN": "思源笔记 Mermaid 代码块双向可视化编辑：画布拖拽节点、双击改字，写回原生 Markdown 块，存储零失真。"
+    "default": "Bidirectional WYSIWYG editor for Mermaid code blocks: drag nodes on canvas, edit text, and sync back to native markdown. Powered by Visimer.",
+    "zh-CN": "思源笔记 Mermaid 代码块双向可视化编辑：画布拖拽节点、双击改字，写回原生 Markdown 块，存储零失真。基于 Visimer。"
   },
   "readme": {
-    "default": "README.md",
-    "zh_CN": "README_zh_CN.md"
+    "default": "README.en.md",
+    "zh-CN": "README.md"
   },
+  "icon": "icon.png",
+  "preview": "preview.png",
   "funding": {
     "openCollective": "",
     "patreon": "",
@@ -26,19 +51,7 @@
     "siyuan",
     "mermaid",
     "wysiwyg",
-    "visual-editor"
-  ],
-  "platforms": [
-    "desktop",
-    "android",
-    "ios"
-  ],
-  "isOfficial": false,
-  "isMobile": true,
-  "scripts": [
-    {
-      "method": "index",
-      "label": "入口"
-    }
+    "visual-editor",
+    "visimer"
   ]
 }
