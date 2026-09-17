@@ -5,14 +5,6 @@ import { VisimerFullAdapter } from "./adapters/visimer-full-adapter";
 import { ReadOnlyAdapter } from "./adapters/readonly-adapter";
 import { initEditorSession, type EditorSession } from "./controller/sync";
 import { openEditorDialog } from "./controller/dialog";
-import { registerShortcutTrigger } from "./controller/shortcut";
-import {
-  DEFAULT_SHORTCUT,
-  loadShortcutSetting,
-  resolveShortcut,
-  saveShortcutSetting,
-  type ShortcutSetting,
-} from "./controller/settings";
 import { registerBlockIconTrigger } from "./controller/trigger";
 import { stripKramdownIal } from "./utils/fence";
 
@@ -63,43 +55,80 @@ async function fetchUpdateBlock(id: string, data: string): Promise<void> {
  */
 export default class MermaidWysiwygEditorPlugin extends Plugin {
   private unregisterBlockIconTrigger: (() => void) | undefined;
-  private unregisterShortcutTrigger: (() => void) | undefined;
-  /** 当前快捷键设置（default | custom），save 后立即更新以即时生效。 */
-  private shortcutSetting: ShortcutSetting = { mode: "default" };
   /** 适配器注册表（onload 组装；能力路由 route() 依此分派 full/readonly/unknown）。 */
   private readonly registry = new AdapterRegistry();
-  // 设置对话框实例由基类 Plugin.setting 承载（siyuan.d.ts:598）：
-  // this.setting 赋值后思源插件列表即显示"设置"按钮（官方 plugin-sample 模式）。
 
   async onload() {
     console.log("[siyuan-mermaid-wysiwyg-editor] plugin loaded");
 
-    // ---- 快捷键设置：读取持久化配置 + 设置界面 ----
-    // this 结构兼容 ShortcutStorage（Plugin 基类自带 loadData/saveData）。
-    this.shortcutSetting = await loadShortcutSetting(this);
-    this.setupSettingUI();
-
     // ---- 适配器注册表：Visimer 全编辑 × 22 种 + 通配只读兜底 ----
     // DIAGRAM_TYPES 来自 @visimer/core，22 种 capability="edit"（含 flowchart/sequence/class/state/
     // er/gantt/pie/sankey/mindmap/architecture 等）+ 1 种 capability="render"（zenuml）。
-    // 精确注册每种 edit 类型 → route() 精确匹配到 kind:"full"；
-    // ReadOnlyAdapter 通配 type="*" → 未精确注册的 render-only + 未知类型走兜底。
     DIAGRAM_TYPES.filter((t) => t.capability === "edit").forEach((t) => {
       this.registry.register(new VisimerFullAdapter({ type: t.id }));
     });
     this.registry.register(new ReadOnlyAdapter());
 
+    // ---- block-icon 触发 ----
     this.unregisterBlockIconTrigger = registerBlockIconTrigger({
       eventBus: this.eventBus,
       onOpenMermaidEditor: (blockId) => this.openMermaidEditor(blockId),
     });
 
-    this.unregisterShortcutTrigger = registerShortcutTrigger({
-      settings: {
-        getEffectiveShortcut: () => resolveShortcut(this.shortcutSetting),
+    // ---- 命令 + 快捷键（思源官方 addCommand，hotkey 用 macOS 符号格式 ⌥⇧⌘）----
+    // 思源会自动注册快捷键、在命令面板显示、允许用户在设置里改键。
+    // ⌥ = Alt, ⇧ = Shift, ⌘ = Ctrl(macOS 上显示为 Command)
+    this.addCommand({
+      langKey: "open-mermaid-wysiwyg",
+      langText: "Mermaid 可视化编辑",
+      hotkey: "⌥⇧M", // Shift+Alt+M
+      editorCallback: (protyle) => {
+        // 思源会在快捷键触发时传当前编辑器的 selection 信息，
+        // 我们从 selection 中找 Mermaid 块的 blockId 来打开编辑器。
+        const blockId = this.findMermaidBlockId(protyle);
+        if (blockId) {
+          this.openMermaidEditor(blockId);
+        } else {
+          console.warn("[siyuan-mermaid-wysiwyg-editor] 光标不在 Mermaid 代码块内");
+        }
       },
-      onTrigger: () => this.openMermaidEditor(),
     });
+
+    // 设置面板：仅保留简短说明（快捷键改键思源内置处理，无需自建设置）
+    this.setting = new Setting({});
+    this.setting.addItem({
+      title: "快捷键",
+      description:
+        "默认 ⌥⇧M（Shift+Alt+M）。可通过思源 设置 → 快捷键 → 插件 → Mermaid WYSIWYG Editor 自定义。",
+    });
+  }
+
+  /**
+   * 从 protyle（思源编辑器实例）中找当前光标所在 Mermaid 代码块的 blockId。
+   * 走 DOM 查询：selection anchorNode → 向上找 NodeCodeBlock[data-subtype="mermaid"]。
+   */
+  private findMermaidBlockId(protyle: unknown): string | undefined {
+    // protyle 结构：protyle.element = 编辑器根 DOM（.protyle-wysiwyg）
+    const protyleEl = (protyle as { element?: HTMLElement })?.element;
+    if (!protyleEl) {
+      return undefined;
+    }
+    const selection = window.getSelection();
+    const anchorNode = selection?.anchorNode;
+    if (!anchorNode) {
+      return undefined;
+    }
+    let el: HTMLElement | null =
+      anchorNode.nodeType === Node.ELEMENT_NODE
+        ? (anchorNode as HTMLElement)
+        : anchorNode.parentElement;
+    while (el && el !== protyleEl) {
+      if (el.dataset.type === "NodeCodeBlock" && el.dataset.subtype === "mermaid") {
+        return el.dataset.id;
+      }
+      el = el.parentElement;
+    }
+    return undefined;
   }
 
   /**
@@ -167,40 +196,9 @@ export default class MermaidWysiwygEditorPlugin extends Plugin {
     );
   }
 
-  /**
-   * 快捷键设置界面（思源官方 Setting 类模式，siyuan.d.ts:796-813）：
-   * 一个输入框 + confirmCallback 保存，saveData 持久化、保存后立即生效。
-   */
-  private setupSettingUI(): void {
-    const input = document.createElement("input");
-    input.id = "mermaid-wysiwyg-shortcut";
-    input.className = "b3-text-field";
-    input.value = resolveShortcut(this.shortcutSetting);
-    input.placeholder = DEFAULT_SHORTCUT;
-
-    this.setting = new Setting({
-      confirmCallback: async () => {
-        const value = input.value.trim();
-        // 空值或等于默认键 → 存 default 形态；否则存 custom 形态。
-        const next: ShortcutSetting =
-          value === "" || value === DEFAULT_SHORTCUT ? { mode: "default" } : { mode: "custom", value };
-        this.shortcutSetting = next; // 立即生效：下一次 keydown 即按新键匹配
-        await saveShortcutSetting(this, next);
-      },
-    });
-    this.setting.addItem({
-      title: "可视化编辑快捷键",
-      description:
-        "光标位于 Mermaid 代码块内时按下触发。请避开思源已占用的 Alt+M / Ctrl+M / Ctrl+Alt+M / Ctrl+Shift+M。",
-      actionElement: input,
-    });
-  }
-
   onunload() {
     this.unregisterBlockIconTrigger?.();
     this.unregisterBlockIconTrigger = undefined;
-    this.unregisterShortcutTrigger?.();
-    this.unregisterShortcutTrigger = undefined;
     console.log("[siyuan-mermaid-wysiwyg-editor] plugin unloaded");
   }
 }

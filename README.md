@@ -7,6 +7,24 @@
 [![Visimer](https://img.shields.io/badge/Visimer-1.1.x-7c3aed)](https://github.com/visimer/visimer)
 [![License](https://img.shields.io/badge/License-MIT-green)](./LICENSE)
 
+## 🙏 致谢
+
+本插件的可视化编辑能力完全基于 [**Visimer**](https://github.com/inkeep/visimer) ——
+一个 Mermaid WYSIWYG 编辑器的 headless 引擎 + 交互式画布框架。Visimer 提供了：
+
+- **`@visimer/core`** — 纯 TypeScript headless 编辑引擎，把 Mermaid 文本编译成可编辑的 AST，再从 AST 编译回文本（双向同步的关键）
+- **`@visimer/dom`** — 交互式画布（MermaidCanvasView），内置 Select/Connect 工具、popover 属性面板、Plus 按钮、panZoom、fitView
+- **`@visimer/codemirror`** — 官方代码面板，语法高亮 + entity 高亮 + 共享 undo 栈
+
+Visimer 由 [inkeep](https://github.com/inkeep) 团队开发，开源仓库：
+[https://github.com/inkeep/visimer](https://github.com/inkeep/visimer)
+
+**没有 Visimer，就没有这个插件。** 本插件只是把 Visimer 适配到思源插件生态：
+- 思源快捷键系统（`plugin.addCommand`）
+- 思源 block-icon 菜单（`click-blockicon` 事件）
+- 思源内核 API（`fetchSyncPost` 读写块）
+- 原生 DOM 工具栏（Select/Connect/+Node/Undo/Redo）
+
 ## ✨ 功能特性
 
 ### 🎨 可视化编辑（22 种 Mermaid 图类型）
