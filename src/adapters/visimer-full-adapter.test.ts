@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { BackendFactory, RenderBackend, RenderBackendOptions } from "../render/backend";
 import type { AdapterOptions } from "./registry";
-import { FlowChartAdapter } from "./flowchart-adapter";
+import { VisimerFullAdapter } from "./visimer-full-adapter";
 
 /**
  * T6 flowchart 全编辑适配器测试（REQ-RENDER-001 / design.md D5）。
@@ -56,24 +56,24 @@ function makeFactory(backend: RenderBackend): BackendFactory & { createCalls: nu
   return factory;
 }
 
-describe("FlowChartAdapter：元数据（REQ-ADAPTER-001）", () => {
+describe("VisimerFullAdapter：元数据（REQ-ADAPTER-001）", () => {
   it("type = flowchart，supportLevel = full（全编辑）", () => {
-    const adapter = new FlowChartAdapter();
+    const adapter = new VisimerFullAdapter({ type: "flowchart" });
     expect(adapter.type).toBe("flowchart");
     expect(adapter.supportLevel).toBe("full");
   });
 
   it("构造器可无参实例化（缺省后端工厂不触发真实加载）", () => {
-    expect(() => new FlowChartAdapter()).not.toThrow();
+    expect(() => new VisimerFullAdapter({ type: "flowchart" })).not.toThrow();
   });
 });
 
-describe("FlowChartAdapter：init 装配（REQ-RENDER-001）", () => {
+describe("VisimerFullAdapter：init 装配（REQ-RENDER-001）", () => {
   it("init 调用后端 init，透传 code / container / onGraphChange", () => {
     const container = makeContainer();
     const onGraphChange = vi.fn();
     const backend = new FakeBackend();
-    const adapter = new FlowChartAdapter();
+    const adapter = new VisimerFullAdapter({ type: "flowchart" });
 
     adapter.init("graph TD; A-->B", { container, backend, onGraphChange });
 
@@ -88,7 +88,7 @@ describe("FlowChartAdapter：init 装配（REQ-RENDER-001）", () => {
   it("传入 backend 时复用实例：不再经工厂 create", () => {
     const backend = new FakeBackend();
     const factory = makeFactory(backend);
-    const adapter = new FlowChartAdapter({ backendFactory: factory });
+    const adapter = new VisimerFullAdapter({ type: "flowchart", backendFactory: factory });
 
     adapter.init("graph TD; A-->B", {
       container: makeContainer(),
@@ -103,7 +103,7 @@ describe("FlowChartAdapter：init 装配（REQ-RENDER-001）", () => {
   it("onGraphChange 透传：后端触发编辑 → 上层收到 newCode", () => {
     const onGraphChange = vi.fn();
     const backend = new FakeBackend();
-    const adapter = new FlowChartAdapter();
+    const adapter = new VisimerFullAdapter({ type: "flowchart" });
 
     adapter.init("graph TD; A-->B", { container: makeContainer(), backend, onGraphChange });
     backend.emitChange("graph TD; A-->B --> C");
@@ -112,12 +112,12 @@ describe("FlowChartAdapter：init 装配（REQ-RENDER-001）", () => {
   });
 });
 
-describe("FlowChartAdapter：幂等语义", () => {
+describe("VisimerFullAdapter：幂等语义", () => {
   it("重复 init 先 destroy 旧后端再 init 新后端", () => {
     const container = makeContainer();
     const first = new FakeBackend();
     const second = new FakeBackend();
-    const adapter = new FlowChartAdapter();
+    const adapter = new VisimerFullAdapter({ type: "flowchart" });
 
     adapter.init("A", { container, backend: first, onGraphChange: vi.fn() });
     adapter.init("B", { container, backend: second, onGraphChange: vi.fn() });
@@ -129,7 +129,7 @@ describe("FlowChartAdapter：幂等语义", () => {
 
   it("destroy 幂等：未 init / 重复调用均不抛，且后端只销毁一次", () => {
     const backend = new FakeBackend();
-    const adapter = new FlowChartAdapter();
+    const adapter = new VisimerFullAdapter({ type: "flowchart" });
 
     expect(() => adapter.destroy()).not.toThrow();
 
@@ -141,11 +141,11 @@ describe("FlowChartAdapter：幂等语义", () => {
   });
 });
 
-describe("FlowChartAdapter：缺省后端工厂", () => {
+describe("VisimerFullAdapter：缺省后端工厂", () => {
   it("不传 backend 时由注入工厂 create 后端并 init（不依赖真实 Visimer 加载）", () => {
     const backend = new FakeBackend();
     const factory = makeFactory(backend);
-    const adapter = new FlowChartAdapter({ backendFactory: factory });
+    const adapter = new VisimerFullAdapter({ type: "flowchart", backendFactory: factory });
     const container = makeContainer();
     const onGraphChange = vi.fn();
 
@@ -163,7 +163,7 @@ describe("FlowChartAdapter：缺省后端工厂", () => {
   });
 });
 
-describe("FlowChartAdapter：init 转发 backend 拒绝（w4 review Important → T13）", () => {
+describe("VisimerFullAdapter：init 转发 backend 拒绝（w4 review Important → T13）", () => {
   it("backend.init 拒绝时 adapter.init 的 Promise 被转发（可 await 捕获，不产生未处理拒绝）", async () => {
     class RejectBackend implements RenderBackend {
       async init(): Promise<void> {
@@ -171,7 +171,7 @@ describe("FlowChartAdapter：init 转发 backend 拒绝（w4 review Important �
       }
       destroy(): void {}
     }
-    const adapter = new FlowChartAdapter();
+    const adapter = new VisimerFullAdapter({ type: "flowchart" });
     const onGraphChange = vi.fn();
 
     let captured: unknown;
@@ -194,13 +194,18 @@ describe("FlowChartAdapter：init 转发 backend 拒绝（w4 review Important �
     expect(() => adapter.destroy()).not.toThrow();
   });
 
-  it("缺省后端（真实 Visimer 懒加载失败）同样以拒绝上报 VisimerLoadError，可被 await 捕获", async () => {
-    const adapter = new FlowChartAdapter();
+  it("构造器注入的 backendFactory 产出后端 init 拒绝同样被 adapter 转发", async () => {
+    class RejectFactoryBackend implements RenderBackend {
+      async init(): Promise<void> { throw new Error("factory backend boom"); }
+      destroy(): void {}
+    }
+    const factory: BackendFactory = { id: "test", create: () => new RejectFactoryBackend() };
+    const adapter = new VisimerFullAdapter({ type: "flowchart", backendFactory: factory });
     const onGraphChange = vi.fn();
 
     await expect(
       adapter.init("graph TD; A-->B", { container: makeContainer(), onGraphChange })
-    ).rejects.toMatchObject({ code: "VISIMER_LOAD_FAILED" });
+    ).rejects.toMatchObject({ message: "factory backend boom" });
     expect(onGraphChange).not.toHaveBeenCalled();
     expect(() => adapter.destroy()).not.toThrow();
   });

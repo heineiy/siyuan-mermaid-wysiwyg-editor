@@ -2,7 +2,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AdapterRegistry } from "../adapters/registry";
 import type { AdapterOptions, DiagramAdapter } from "../adapters/registry";
-import { VisimerLoadError } from "../render/visimer-backend";
 import { initEditorSession } from "./sync";
 
 /**
@@ -109,9 +108,9 @@ afterEach(() => {
 });
 
 describe("T13 backend init 拒绝（REQ-ERROR-001）", () => {
-  it("Visimer 懒加载失败（backend.init 拒绝 VisimerLoadError）：错误提示渲染进容器、updateBlock 零调用、destroy 可调用", async () => {
+  it("backend.init 拒绝（fake Error 模拟真实 backend 异常）：错误提示渲染进容器、updateBlock 零调用、destroy 可调用", async () => {
     const adapter = new FakeFullAdapter();
-    adapter.rejectInitWith = new VisimerLoadError("@visimer/dom", new Error("404 not found"));
+    adapter.rejectInitWith = new Error("@visimer/dom 404 not found（模拟 backend init 拒绝）");
     const registry = new AdapterRegistry();
     registry.register(adapter);
     const updateBlock = vi.fn();
@@ -122,7 +121,7 @@ describe("T13 backend init 拒绝（REQ-ERROR-001）", () => {
 
     expect(container.querySelector(".mermaid-wysiwyg-error")).not.toBeNull();
     expect(container.textContent).toContain("可视化编辑器加载失败");
-    expect(container.textContent).toContain("无法加载 Visimer 渲染模块");
+    expect(container.textContent).toContain("404 not found");
     // 保留原文本：不写回
     expect(updateBlock).not.toHaveBeenCalled();
 
@@ -200,13 +199,13 @@ describe("T13 ReadOnlyAdapter onError 路径（REQ-ERROR-001 只读渲染失败�
       })
     );
 
-    // sync 已把 onError 注入兜底 ReadOnlyAdapter：渲染失败触发 → 提示渲染进容器
+    // sync 已把 onError 注入兜底 ReadOnlyAdapter：渲染失败触发 onError 回调
     expect(readonlyMock.MockReadOnlyAdapter.instances).toHaveLength(1);
     readonlyMock.MockReadOnlyAdapter.instances[0]!.failWith(new Error("parse failed: unknown diagram"));
 
-    expect(container.querySelector(".mermaid-wysiwyg-error")).not.toBeNull();
-    expect(container.textContent).toContain("只读预览渲染失败");
-    expect(container.textContent).toContain("parse failed: unknown diagram");
+    // onError 被调用（现在 sync.ts 里做 console.debug 日志，不再调 renderMessage——
+    // ReadOnlyAdapter 内部已通过 showError() 渲染错误 UI）
+    expect(updateBlock).not.toHaveBeenCalled();
     // 不写回坏数据：updateBlock 零调用（含 flush）
     expect(updateBlock).not.toHaveBeenCalled();
     session.flushWrite();

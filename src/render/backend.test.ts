@@ -1,36 +1,109 @@
+// @vitest-environment happy-dom
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { BackendFactory, RenderBackend, RenderBackendOptions } from "./backend";
-import {
-  VISIMER_MODULE,
-  VisimerBackend,
-  VisimerLoadError,
-  createVisimerBackend,
-  visimerBackendFactory,
-} from "./visimer-backend";
 
 /**
  * T4 接口契约测试（REQ-BACKEND-001 / REQ-RENDER-001）。
  *
- * 测试环境为 node（无 jsdom），用最小 fake container 代替真实 DOM 容器；
- * 真实 Visimer 包（@visimer/dom）未发布到 npm（2026-09-16 核实），
- * 因此懒加载失败路径是生产真实路径；成功路径用 vi.doMock 的假模块验证 seam 全链路。
+ * 测试策略：真实 @visimer/core/@visimer/dom 需要 mermaid 渲染 + 完整 DOM，
+ * 单测环境（happy-dom）不具备真实 mermaid 运行能力，因此对 Visimer 做 vi.mock，
+ * 验证 VisimerBackend 正确组装 MermaidWysiwygEditor + MermaidCanvasView、
+ * 正确订阅 change 事件并转发给 onGraphChange、destroy 正确清理。
  */
 
-/** 最小 DOM 容器替身：仅实现 seam 测试需要的两个方法。 */
-function makeContainer(): HTMLElement {
-  const container = {
-    children: [] as unknown[],
-    appendChild(el: unknown): void {
-      container.children.push(el);
-    },
-    replaceChildren(): void {
-      container.children.length = 0;
-    },
+const mocks = vi.hoisted(() => {
+  class MockEditor {
+    result = { typeInfo: { id: "flowchart", capability: "edit" }, flowchart: { direction: "TD" } };
+    selection: string[] = [];
+    canUndo = false;
+    canRedo = false;
+    dispatch = vi.fn(() => ({ created: [] }));
+    undo = vi.fn();
+    redo = vi.fn();
+    deleteEntities = vi.fn();
+    code = "";
+    code: string;
+    changeHandlers: Array<({ code }: { code: string }) => void> = [];
+    constructor(opts: { code: string }) {
+      this.code = opts.code;
+    }
+    on(event: string, fn: ({ code }: { code: string }) => void): () => void {
+      if (event === "change") {
+        this.changeHandlers.push(fn);
+      }
+      return () => {
+        this.changeHandlers = this.changeHandlers.filter((h) => h !== fn);
+      };
+    }
+    emitChange(newCode: string): void {
+      for (const h of [...this.changeHandlers]) {
+        h({ code: newCode });
+      }
+    }
+  }
+
+  class MockView {
+    renderError: string | null = null;
+    setTool = vi.fn();
+    addNode = vi.fn();
+    toolChangeHandlers: Array<() => void> = [];
+    on = vi.fn((event: string, fn: () => void) => { if (event === "render") this.toolChangeHandlers.push(fn); return () => {}; });
+    editor: unknown;
+    container: unknown;
+    mermaid: unknown;
+    destroyCalls = 0;
+    constructor(opts: { editor: unknown; container: unknown; mermaid: unknown }) {
+      this.editor = opts.editor;
+      this.container = opts.container;
+      this.mermaid = opts.mermaid;
+    }
+    destroy(): void {
+      this.destroyCalls += 1;
+    }
+  }
+
+  return {
+    MockEditor,
+    MockView,
+    editorCtor: vi.fn().mockImplementation(function(opts) { return new MockEditor(opts); }),
+    viewCtor: vi.fn().mockImplementation(function(opts) { return new MockView(opts); }),
   };
-  return container as unknown as HTMLElement;
+});
+
+vi.mock("@visimer/core", () => ({
+  MermaidWysiwygEditor: mocks.editorCtor,
+  bindTextPane: vi.fn().mockReturnValue({
+    applying: false,
+    notifyTextChange: vi.fn(),
+    notifyCaretMove: vi.fn(),
+    undo: vi.fn(),
+    redo: vi.fn(),
+    dispose: vi.fn(),
+  }),
+}));
+
+vi.mock("@visimer/dom", () => ({
+  MermaidCanvasView: mocks.viewCtor,
+}));
+
+vi.mock("@visimer/codemirror", () => ({
+  MermaidCodeMirror: vi.fn().mockImplementation(function () {
+    return { destroy: vi.fn(), view: { destroy: vi.fn() } };
+  }),
+}));
+
+/** 最小 mock mermaid：满足 MermaidLike 形状。 */
+const mockMermaid = {
+  initialize: vi.fn(),
+  render: vi.fn().mockResolvedValue({ svg: "<svg></svg>" }),
+  parse: vi.fn().mockResolvedValue({}),
+};
+
+function makeContainer(): HTMLElement {
+  return document.createElement("div");
 }
 
-/** REQ-BACKEND-001 场景用的 fake 后端：实现 RenderBackend 接口即可被注入。 */
+/** REQ-BACKEND-001 场景用的 fake 后端。 */
 class FakeBackend implements RenderBackend {
   initCalls: string[] = [];
   destroyCalls = 0;
@@ -45,13 +118,11 @@ class FakeBackend implements RenderBackend {
     this.destroyCalls += 1;
   }
 
-  /** 模拟用户在画布中编辑后触发回调。 */
   emitChange(code: string): void {
     this.onChange?.(code);
   }
 }
 
-/** 与适配层/同步核心等价的通用消费方：只依赖 RenderBackend 接口。 */
 async function runBackendSession(
   backend: RenderBackend,
   code: string,
@@ -63,137 +134,117 @@ async function runBackendSession(
 
 describe("RenderBackend 可替换契约（REQ-BACKEND-001）", () => {
   it("满足接口的 fake 后端可被通用消费方注入使用", async () => {
-    const container = makeContainer();
     const onGraphChange = vi.fn();
     const fake = new FakeBackend();
-
-    await runBackendSession(fake, "graph TD; A-->B", { container, onGraphChange });
-
-    expect(fake.initCalls).toEqual(["graph TD; A-->B"]);
+    await runBackendSession(fake, "flowchart TD\n  A --> B", { container: makeContainer(), onGraphChange });
+    expect(fake.initCalls).toEqual(["flowchart TD\n  A --> B"]);
     expect(fake.destroyCalls).toBe(1);
     expect(onGraphChange).not.toHaveBeenCalled();
   });
 
-  it("fake 后端编辑后触发 onGraphChange(newCode)（REQ-RENDER-001 回调契约）", async () => {
+  it("fake 后端编辑后触发 onGraphChange(newCode)", async () => {
     const onGraphChange = vi.fn();
     const fake = new FakeBackend();
-    await fake.init("graph TD; A-->B", { container: makeContainer(), onGraphChange });
-
-    fake.emitChange("graph TD; A-->B --> C");
-
-    expect(onGraphChange).toHaveBeenCalledExactlyOnceWith("graph TD; A-->B --> C");
+    await fake.init("flowchart TD\n  A --> B", { container: makeContainer(), onGraphChange });
+    fake.emitChange("flowchart TD\n  A --> B --> C");
+    expect(onGraphChange).toHaveBeenCalledExactlyOnceWith("flowchart TD\n  A --> B --> C");
   });
 
-  it("BackendFactory 使后端可按 id 注入（VueFlow 等新后端走同一入口）", () => {
+  it("BackendFactory 使后端可按 id 注入", () => {
     const factory: BackendFactory = { id: "fake", create: () => new FakeBackend() };
     const backend = factory.create();
     expect(backend).toBeInstanceOf(FakeBackend);
-    // 结构上满足 RenderBackend：编译期已证明，运行时验证接口形状。
-    expect(typeof backend.init).toBe("function");
-    expect(typeof backend.destroy).toBe("function");
-  });
-
-  it("visimer 工厂产出可注入的 RenderBackend", () => {
-    expect(visimerBackendFactory.id).toBe("visimer");
-    const backend = visimerBackendFactory.create();
-    expect(backend).toBeInstanceOf(VisimerBackend);
     expect(typeof backend.init).toBe("function");
     expect(typeof backend.destroy).toBe("function");
   });
 });
 
-describe("VisimerBackend 懒加载 seam", () => {
+describe("VisimerBackend 真实组装", () => {
   afterEach(() => {
-    vi.doUnmock(VISIMER_MODULE);
-    vi.resetModules();
+    vi.clearAllMocks();
   });
 
-  it("懒加载失败路径：init 以明确错误拒绝而非抛出未捕获异常", async () => {
-    const backend = new VisimerBackend();
-    const onGraphChange = vi.fn();
-    let captured: unknown;
-
-    try {
-      await backend.init("graph TD; A-->B", { container: makeContainer(), onGraphChange });
-    } catch (err) {
-      captured = err;
-    }
-
-    expect(captured).toBeInstanceOf(VisimerLoadError);
-    expect((captured as VisimerLoadError).code).toBe("VISIMER_LOAD_FAILED");
-    expect((captured as VisimerLoadError).message).toContain(VISIMER_MODULE);
-    // 失败不产生任何编辑回调
-    expect(onGraphChange).not.toHaveBeenCalled();
-    // 失败后 destroy 仍可安全调用（不抛）
-    expect(() => backend.destroy()).not.toThrow();
-  });
-
-  it("destroy 幂等：未 init 时重复调用不抛", () => {
-    const backend = new VisimerBackend();
-    expect(() => {
-      backend.destroy();
-      backend.destroy();
-      backend.destroy();
-    }).not.toThrow();
-  });
-
-  it("destroy 幂等：init 失败后重复调用不抛", async () => {
-    const backend = new VisimerBackend();
-    await expect(
-      backend.init("graph TD; A-->B", { container: makeContainer(), onGraphChange: vi.fn() }),
-    ).rejects.toBeInstanceOf(VisimerLoadError);
-
-    expect(() => {
-      backend.destroy();
-      backend.destroy();
-    }).not.toThrow();
-  });
-
-  it("成功路径（mock @visimer/dom）：mount → onChange → destroy 清理全链路", async () => {
+  it("init 创建 MermaidWysiwygEditor + MermaidCanvasView，传正确参数", async () => {
+    const { VisimerBackend } = await import("./visimer-backend");
+    const backend = new VisimerBackend({ mermaidInstance: mockMermaid as unknown as typeof import("mermaid").default });
     const container = makeContainer();
-    const unmount = vi.fn(() => {
-      container.replaceChildren();
-    });
-    const mount = vi.fn(
-      (o: { container: HTMLElement; code: string; onChange: (code: string) => void }) => {
-        o.container.appendChild({ tag: "canvas" } as unknown as Node);
-        return { unmount };
-      },
-    );
-    vi.doMock(VISIMER_MODULE, () => ({ mount }));
-
-    const { VisimerBackend: FreshBackend } = await import("./visimer-backend");
-    const backend = new FreshBackend();
     const onGraphChange = vi.fn();
 
-    await backend.init("graph TD; A-->B", { container, onGraphChange });
+    await backend.init("flowchart TD\n  A --> B", { container, onGraphChange });
 
-    expect(mount).toHaveBeenCalledExactlyOnceWith({
-      container,
-      code: "graph TD; A-->B",
-      onChange: expect.any(Function),
-    });
-    expect(container.children).toHaveLength(1);
-
-    // 模拟画布编辑（seam 把 mount 收到的 onChange 接到 onGraphChange）
-    const mountedOnChange = mount.mock.calls[0]?.[0].onChange;
-    expect(mountedOnChange).toBeTypeOf("function");
-    mountedOnChange?.("graph TD; A-->B --> C");
-    expect(onGraphChange).toHaveBeenCalledExactlyOnceWith("graph TD; A-->B --> C");
-
-    // destroy：卸载画布 + DOM 清理 + 幂等
-    backend.destroy();
-    expect(unmount).toHaveBeenCalledTimes(1);
-    expect(container.children).toHaveLength(0);
-    expect(() => backend.destroy()).not.toThrow();
-    expect(unmount).toHaveBeenCalledTimes(1);
+    expect(mocks.editorCtor).toHaveBeenCalledExactlyOnceWith({ code: "flowchart TD\n  A --> B" });
+    // container 不再是原始 container——backend 内部会创建 flex 布局 + canvasSlot，
+    // viewCtor 接到的是 layout 内部的 canvas-slot div。用 .mw-canvas-slot class 校验即可。
+    const calledContainer = mocks.viewCtor.mock.calls[0]?.[0]?.container as HTMLElement;
+    expect(calledContainer.classList.contains("mw-canvas-slot")).toBe(true);
+    // 原始 container 应该已经被改成 flex column + 含 toolbar + body 结构
+    expect(container.style.display).toBe("flex");
+    expect(container.style.flexDirection).toBe("column");
+    expect(container.children.length).toBe(3); // toolbar + body
+    expect(mocks.viewCtor).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({
+      editor: expect.any(mocks.MockEditor),
+      mermaid: mockMermaid,
+      panZoom: true,
+      readOnly: false,
+      accentColor: "#2b6cb0",
+    }));
   });
 
-  it("createVisimerBackend 产出接口合规后端（懒加载失败也以拒绝上报）", async () => {
-    const backend = createVisimerBackend();
-    await expect(
-      backend.init("graph TD; A-->B", { container: makeContainer(), onGraphChange: vi.fn() }),
-    ).rejects.toMatchObject({ code: "VISIMER_LOAD_FAILED" });
-    expect(() => backend.destroy()).not.toThrow();
+  it("editor change 事件转发到 onGraphChange（REQ-RENDER-001 反向流）", async () => {
+    const { VisimerBackend } = await import("./visimer-backend");
+    const backend = new VisimerBackend({ mermaidInstance: mockMermaid as unknown as typeof import("mermaid").default });
+    const onGraphChange = vi.fn();
+    const container = makeContainer();
+
+    await backend.init("flowchart TD\n  A --> B", { container, onGraphChange });
+
+    const editor = mocks.editorCtor.mock.results[0]?.value as InstanceType<typeof mocks.MockEditor>;
+    editor.emitChange("flowchart TD\n  A[Start] --> B");
+    expect(onGraphChange).toHaveBeenCalledExactlyOnceWith("flowchart TD\n  A[Start] --> B");
+  });
+
+  it("destroy 清理 view + 解绑 change 订阅，幂等", async () => {
+    const { VisimerBackend } = await import("./visimer-backend");
+    const backend = new VisimerBackend({ mermaidInstance: mockMermaid as unknown as typeof import("mermaid").default });
+    const container = makeContainer();
+    const onGraphChange = vi.fn();
+
+    await backend.init("flowchart TD\n  A --> B", { container, onGraphChange });
+
+    backend.destroy();
+    const view = mocks.viewCtor.mock.results[0]?.value as InstanceType<typeof mocks.MockView>;
+    expect(view.destroyCalls).toBe(1);
+
+    backend.destroy();
+    expect(view.destroyCalls).toBe(1);
+
+    const editor = mocks.editorCtor.mock.results[0]?.value as InstanceType<typeof mocks.MockEditor>;
+    editor.emitChange("new code");
+    expect(onGraphChange).not.toHaveBeenCalled();
+  });
+
+  it("destroy 幂等：未 init 时重复调用不抛", async () => {
+    const { VisimerBackend } = await import("./visimer-backend");
+    const backend = new VisimerBackend();
+    expect(() => {
+      backend.destroy();
+      backend.destroy();
+    }).not.toThrow();
+  });
+
+  it("重复 init 先销毁旧实例再重建（幂等保护）", async () => {
+    const { VisimerBackend } = await import("./visimer-backend");
+    const backend = new VisimerBackend({ mermaidInstance: mockMermaid as unknown as typeof import("mermaid").default });
+    const container = makeContainer();
+    const onGraphChange = vi.fn();
+
+    await backend.init("code1", { container, onGraphChange });
+    const view1 = mocks.viewCtor.mock.results[0]?.value as InstanceType<typeof mocks.MockView>;
+
+    await backend.init("code2", { container, onGraphChange });
+    const view2 = mocks.viewCtor.mock.results[1]?.value as InstanceType<typeof mocks.MockView>;
+
+    expect(view1.destroyCalls).toBe(1);
+    expect(view2.destroyCalls).toBe(0);
   });
 });

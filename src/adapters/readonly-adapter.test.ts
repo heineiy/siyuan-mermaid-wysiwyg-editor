@@ -74,7 +74,7 @@ describe("ReadOnlyAdapter：init 只读渲染（REQ-DEGRADE-001）", () => {
     expect(container.innerHTML).toContain("<svg>hi</svg>");
   });
 
-  it("init 全程不触发 onGraphChange（禁编辑、无写回）", async () => {
+  it("render 成功时自动回调 onGraphChange（合法代码写回思源）", async () => {
     const adapter = new ReadOnlyAdapter({
       renderer: vi.fn(async () => ({ svg: "<svg>x</svg>" })),
     });
@@ -82,7 +82,9 @@ describe("ReadOnlyAdapter：init 只读渲染（REQ-DEGRADE-001）", () => {
 
     await adapter.init("erDiagram\n  A ||--o| B", makeOpts(document.createElement("div"), onGraphChange));
 
-    expect(onGraphChange).not.toHaveBeenCalled();
+    // 首次 render 成功 → 代码合法 → 写回思源
+    expect(onGraphChange).toHaveBeenCalledTimes(1);
+    expect(onGraphChange).toHaveBeenCalledWith("erDiagram\n  A ||--o| B");
   });
 
   it("重复 init：先清理旧渲染产物再挂载新结果", async () => {
@@ -103,7 +105,7 @@ describe("ReadOnlyAdapter：init 只读渲染（REQ-DEGRADE-001）", () => {
 });
 
 describe("ReadOnlyAdapter：渲染失败降级（T13 接线点）", () => {
-  it("renderer 失败 → 构造注入的 onError 收到错误，且绝不回调 onGraphChange", async () => {
+  it("renderer 失败 → 构造注入的 onError 收到错误，绝不回调 onGraphChange，但仍建分屏布局让用户可修代码", async () => {
     const boom = new Error("parse failed: unknown diagram");
     const renderer = vi.fn(async () => {
       throw boom;
@@ -118,8 +120,13 @@ describe("ReadOnlyAdapter：渲染失败降级（T13 接线点）", () => {
     expect(onError).toHaveBeenCalledTimes(1);
     expect(onError).toHaveBeenCalledWith(boom);
     expect(onGraphChange).not.toHaveBeenCalled();
-    // 失败不挂载任何产物，不写回坏数据
-    expect(container.innerHTML).toBe("");
+    // 失败仍建分屏布局（toolbar + textarea + preview-slot）——用户需要 textarea 修代码
+    expect(container.innerHTML).toContain("mw-toolbar");
+    expect(container.innerHTML).toContain("mw-code-editor"); // textarea
+    expect(container.innerHTML).toContain("mw-preview-slot");
+    // preview-slot 里有错误提示（红框）
+    expect(container.innerHTML).toContain("⚠ Mermaid 语法错误");
+    expect(container.innerHTML).toContain("parse failed: unknown diagram");
   });
 
   it("未注入 onError 时失败不抛未捕获异常（静默降级）", async () => {

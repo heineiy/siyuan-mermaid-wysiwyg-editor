@@ -19,6 +19,14 @@
   "author": "mermaid-wysiwyg",
   "license": "MIT",
   "dependencies": {
+    "@codemirror/commands": "^6.11.1",
+    "@codemirror/language": "^6.12.4",
+    "@codemirror/state": "^6.7.5",
+    "@codemirror/view": "^6.43.12",
+    "@lezer/highlight": "^1.2.3",
+    "@visimer/codemirror": "^1.1.2",
+    "@visimer/core": "^1.1.2",
+    "@visimer/dom": "^1.1.2",
     "mermaid": "^12.0.0",
     "siyuan": "1.2.7"
   },

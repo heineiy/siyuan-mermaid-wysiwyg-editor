@@ -73,7 +73,7 @@ class FakeFullAdapter implements DiagramAdapter {
 
 /** fake readonly 适配器：只读渲染（不回调 onGraphChange），记录 init/destroy。 */
 class FakeReadonlyAdapter implements DiagramAdapter {
-  readonly type = "sequenceDiagram" as const;
+  readonly type = "sequence" as const;
   readonly supportLevel = "readonly" as const;
   initCalls = 0;
   destroyCalls = 0;
@@ -286,7 +286,7 @@ describe("T11 readonly / unknown 路由（不建立写回通道）", () => {
     expect(fallback.destroy).toHaveBeenCalledTimes(1);
   });
 
-  it("unknown 路由：提示文案渲染进容器 + 兜底 ReadOnlyAdapter init + 不写回", async () => {
+  it("unknown 路由：兜底 ReadOnlyAdapter 建分屏布局 + 真实写回通道（但首次 render 失败不写回坏数据）", async () => {
     const registry = new AdapterRegistry();
     const updateBlock = vi.fn();
     const container = makeContainer();
@@ -296,17 +296,16 @@ describe("T11 readonly / unknown 路由（不建立写回通道）", () => {
         registry,
         container,
         updateBlock,
-        getBlockMarkdown: () => "```mermaid\nzenuml\n  A->B\n```",
+        getBlockMarkdown: () => "```mermaid\nfoobarDiagram\n  A->B\n```",
       })
     );
 
-    // 提示文案渲染进画布容器
-    expect(container.textContent).toContain("该图类型暂不支持可视化编辑");
-    // 兜底 ReadOnlyAdapter 已 init
+    // 兜底 ReadOnlyAdapter 已 init（现在会建分屏布局：toolbar + textarea + preview-slot）
     expect(readonlyMock.MockReadOnlyAdapter.instances).toHaveLength(1);
     expect(readonlyMock.MockReadOnlyAdapter.instances[0]!.init).toHaveBeenCalledTimes(1);
-    // 不建立写回
+    // 首次 render 失败（foobarDiagram 未知类型）→ 不写回坏数据
     expect(updateBlock).not.toHaveBeenCalled();
+    // flushWrite 接通真实 debounce 通道（空队列 → 不触发 updateBlock；有挂起变更才会）
     session.flushWrite();
     expect(updateBlock).not.toHaveBeenCalled();
 
