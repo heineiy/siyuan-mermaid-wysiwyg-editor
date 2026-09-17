@@ -1,5 +1,5 @@
 /**
- * block-icon 触发入口（REQ-TRIGGER-001 / D §5.1）。
+ * block-icon 触发入口。
  *
  * 事实核实（2026-09-16，思源 3.8.3 生产验证三重证据交叉确认）：
  * - `click-blockicon` 事件负载 `{ menu: subMenu, protyle, blockElements }`

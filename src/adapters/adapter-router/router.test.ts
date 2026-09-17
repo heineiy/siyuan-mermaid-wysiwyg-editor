@@ -38,14 +38,14 @@ describe("detectDiagramType：Mermaid 首行类型判定", () => {
   });
 
   it("sequenceDiagram 判定", () => {
-    expect(detectDiagramType("sequenceDiagram\n  A->>B: hi")).toBe("sequenceDiagram");
+    expect(detectDiagramType("sequenceDiagram\n  A->>B: hi")).toBe("sequence");
   });
 
   it("已知常见类型逐一判定（classDiagram/gantt/stateDiagram-v2/erDiagram/pie/journey/mindmap）", () => {
-    expect(detectDiagramType("classDiagram\n  A <|-- B")).toBe("classDiagram");
+    expect(detectDiagramType("classDiagram\n  A <|-- B")).toBe("class");
     expect(detectDiagramType("gantt\ndateFormat YYYY-MM-DD")).toBe("gantt");
-    expect(detectDiagramType("stateDiagram-v2\n  [*] --> S")).toBe("stateDiagram-v2");
-    expect(detectDiagramType("erDiagram\n  A ||--o| B")).toBe("erDiagram");
+    expect(detectDiagramType("stateDiagram-v2\n  [*] --> S")).toBe("state");
+    expect(detectDiagramType("erDiagram\n  A ||--o| B")).toBe("er");
     expect(detectDiagramType("pie\n  title Pie")).toBe("pie");
     expect(detectDiagramType("journey\n  title My day")).toBe("journey");
     expect(detectDiagramType("mindmap\n  root((x))")).toBe("mindmap");
@@ -68,9 +68,9 @@ describe("detectDiagramType：Mermaid 首行类型判定", () => {
 });
 
 describe("isKnownDiagramType / KNOWN_DIAGRAM_TYPES", () => {
-  it("flowchart 与 sequenceDiagram 为已知类型", () => {
+  it("flowchart 与 sequence 为已知类型", () => {
     expect(isKnownDiagramType("flowchart")).toBe(true);
-    expect(isKnownDiagramType("sequenceDiagram")).toBe(true);
+    expect(isKnownDiagramType("sequence")).toBe(true);
   });
 
   it("未知类型不为已知", () => {
@@ -80,11 +80,11 @@ describe("isKnownDiagramType / KNOWN_DIAGRAM_TYPES", () => {
   it("KNOWN_DIAGRAM_TYPES 覆盖任务列举的常见类型（除 flowchart 外本期仅 readonly）", () => {
     for (const t of [
       "flowchart",
-      "sequenceDiagram",
-      "classDiagram",
+      "sequence",
+      "class",
       "gantt",
-      "stateDiagram-v2",
-      "erDiagram",
+      "state",
+      "er",
       "pie",
       "journey",
       "mindmap",
@@ -112,14 +112,14 @@ describe("route：三路路由（REQ-DEGRADE-001）", () => {
 
   it("已知类型仅注册 readonly 适配器 → 只读预览（kind: readonly，携带适配器与提示）", () => {
     const registry = new AdapterRegistry();
-    const readonly = makeAdapter("sequenceDiagram", "readonly");
+    const readonly = makeAdapter("sequence", "readonly");
     registry.register(readonly);
 
     const result = route("sequenceDiagram\n  A->>B: hi", registry);
 
     expect(result.kind).toBe("readonly");
     if (result.kind === "readonly") {
-      expect(result.type).toBe("sequenceDiagram");
+      expect(result.type).toBe("sequence");
       expect(result.adapter).toBe(readonly);
       expect(result.message).toBe(READONLY_TYPE_MESSAGE);
     }

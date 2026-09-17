@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Mock } from "vitest";
 import { AdapterRegistry } from "../adapters/registry";
 import type { AdapterOptions, DiagramAdapter } from "../adapters/registry";
-import { FlowChartAdapter } from "../adapters/flowchart-adapter";
+import { VisimerFullAdapter } from "../adapters/visimer-full-adapter";
 import { ReadOnlyAdapter } from "../adapters/readonly-adapter";
 import { route } from "../adapters/router";
 import type { BackendFactory, RenderBackend, RenderBackendOptions } from "../render/backend";
@@ -15,7 +15,7 @@ import { stripFence, wrapFence } from "../utils/fence";
  * T14 验收用例套件（§11 四项验收，w6-acceptance / REQ-STORAGE-001 / tasks.md T14）。
  *
  * 真实思源宿主不可用（2026-09-16），本套件以「模拟宿主 + 全链路组装」验证闭环语义：
- * - **真实实现**：AdapterRegistry / FlowChartAdapter / ReadOnlyAdapter / route /
+ * - **真实实现**：AdapterRegistry / VisimerFullAdapter / ReadOnlyAdapter / route /
  *   initEditorSession / stripFence / wrapFence / createDebounce 全部为真实代码
  *   （不 mock 被测核心）；
  * - **仅 mock 注入项**：宿主 getBlockMarkdown / updateBlock（vi.fn 注入）；
@@ -85,23 +85,23 @@ class FakeRenderBackend implements RenderBackend {
   }
 }
 
-/** 后端工厂：使 FlowChartAdapter（真实实现）经 seam 装配 fake 后端。 */
+/** 后端工厂：使 VisimerFullAdapter（真实实现）经 seam 装配 fake 后端。 */
 function makeBackendFactory(backend: RenderBackend): BackendFactory {
   return { id: "fake-acceptance", create: () => backend };
 }
 
 /**
- * 假想的 full 适配器（验收④）：复用 FlowChartAdapter 构造（后端装配/init/destroy
+ * 假想的 full 适配器（验收④）：复用 VisimerFullAdapter 构造（后端装配/init/destroy
  * 全委托），仅更换图类型标签 type="xmind"——模拟「新增 full 图类型适配器零改动接入」。
  */
 class XmindAdapter implements DiagramAdapter {
   readonly type = "xmind" as const;
   readonly supportLevel = "full" as const;
 
-  private readonly inner: FlowChartAdapter;
+  private readonly inner: VisimerFullAdapter;
 
   constructor(options: { backendFactory?: BackendFactory } = {}) {
-    this.inner = new FlowChartAdapter(options);
+    this.inner = new VisimerFullAdapter({ type: "flowchart", ...options });
   }
 
   init(code: string, opts: AdapterOptions): Promise<void> {
@@ -113,7 +113,7 @@ class XmindAdapter implements DiagramAdapter {
   }
 }
 
-/** 全链路组装会话（对齐 src/index.ts onload 接线）：真实 registry + FlowChartAdapter + ReadOnlyAdapter。 */
+/** 全链路组装会话（对齐 src/index.ts onload 接线）：真实 registry + VisimerFullAdapter + ReadOnlyAdapter。 */
 interface OpenSessionOverrides {
   getBlockMarkdown?: () => string;
   updateBlock?: Mock<(_id: string, data: string) => Promise<void> | void>;
@@ -133,7 +133,7 @@ async function openSession(overrides: OpenSessionOverrides = {}): Promise<{
     overrides.registry ??
     (() => {
       const r = new AdapterRegistry();
-      r.register(new FlowChartAdapter({ backendFactory: makeBackendFactory(backend) }));
+      r.register(new VisimerFullAdapter({ type: "flowchart", backendFactory: makeBackendFactory(backend) }));
       r.register(new ReadOnlyAdapter());
       return r;
     })();
@@ -324,11 +324,11 @@ describe("验收④ 模拟新增 full 适配器零改动接入（REQ-ADAPTER-001
   it("注册假想 full 适配器（type=xmind）→ route 返回 full → 同一 initEditorSession 双向同步零改动", async () => {
     vi.useFakeTimers();
     try {
-      // 全链路组装：真实 flowchart + 兜底 readonly + 假想 xmind full 适配器（复用 FlowChartAdapter 构造）
+      // 全链路组装：真实 flowchart + 兜底 readonly + 假想 xmind full 适配器（复用 VisimerFullAdapter 构造）
       const xmindBackend = new FakeRenderBackend();
       const xmindAdapter = new XmindAdapter({ backendFactory: makeBackendFactory(xmindBackend) });
       const registry = new AdapterRegistry();
-      registry.register(new FlowChartAdapter({ backendFactory: makeBackendFactory(new FakeRenderBackend()) }));
+      registry.register(new VisimerFullAdapter({ type: "flowchart", backendFactory: makeBackendFactory(new FakeRenderBackend()) }));
       registry.register(new ReadOnlyAdapter());
       registry.register(xmindAdapter);
 

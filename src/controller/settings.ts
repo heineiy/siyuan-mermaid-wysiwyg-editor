@@ -1,5 +1,5 @@
 /**
- * 快捷键设置读写（REQ-TRIGGER-003 / D6）。
+ * 快捷键设置读写。
  *
  * 事实核实（2026-09-16，siyuan@1.2.7 类型定义 siyuan.d.ts:698-700 + 官方
  * 插件开发文档）：
@@ -18,7 +18,7 @@
  */
 import { parseShortcut } from "./shortcut";
 
-/** 默认快捷键（思源官方默认未占用，D6 核实；Alt+M / Ctrl+M / Ctrl+Alt+M / Ctrl+Shift+M 均被占用）。 */
+/** 默认快捷键（思源官方默认未占用；Alt+M / Ctrl+M / Ctrl+Alt+M / Ctrl+Shift+M 均被占用）。 */
 export const DEFAULT_SHORTCUT = "Shift+Alt+M";
 
 /** 快捷键配置存储文件名（plugin.saveData/loadData 的相对路径）。 */

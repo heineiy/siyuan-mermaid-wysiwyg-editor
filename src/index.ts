@@ -1,6 +1,7 @@
 import { Plugin, Setting, fetchSyncPost } from "siyuan";
+import { DIAGRAM_TYPES } from "@visimer/core";
 import { AdapterRegistry } from "./adapters/registry";
-import { FlowChartAdapter } from "./adapters/flowchart-adapter";
+import { VisimerFullAdapter } from "./adapters/visimer-full-adapter";
 import { ReadOnlyAdapter } from "./adapters/readonly-adapter";
 import { initEditorSession, type EditorSession } from "./controller/sync";
 import { openEditorDialog } from "./controller/dialog";
@@ -48,24 +49,24 @@ async function fetchUpdateBlock(id: string, data: string): Promise<void> {
  * Mermaid 双向可视化编辑插件入口。
  *
  * 已落地：
- * - T1：最小可加载骨架（onload / onunload 生命周期日志）。
- * - T9：block-icon 触发入口 —— 监听思源 `click-blockicon`，命中 Mermaid 代码块
+ * - 最小可加载骨架（onload / onunload 生命周期日志）。
+ * - block-icon 触发入口 —— 监听思源 `click-blockicon`，命中 Mermaid 代码块
  *   时弹出含"可视化编辑"的块菜单，点击后打开受控 Dialog（容器就绪）；
  *   非 Mermaid 块零副作用；onunload 卸载监听。
- * - T10：快捷键触发 + 可配置设置 —— 默认 `Shift+Alt+M`，光标位于 Mermaid
- *   代码块内触发（与 T9 走同一 Dialog 打开路径）；设置项（思源官方 Setting
+ * - 快捷键触发 + 可配置设置 —— 默认 `Shift+Alt+M`，光标位于 Mermaid
+ *   代码块内触发（与 block-icon 走同一 Dialog 打开路径）；设置项（思源官方 Setting
  *   类）可改键，saveData 持久化、保存后立即生效（旧键失效、新键生效）。
- * - T11：双向同步协调器接线 —— onload 组装适配器注册表（FlowChartAdapter +
- *   ReadOnlyAdapter）；打开 Dialog 后经 initEditorSession 建立正向（读块源码 →
- *   剥离围栏 → 适配器渲染）与反向（onGraphChange → 防抖 → wrapFence → updateBlock）
- *   闭环，Dialog 关闭（onDestroy）时 flush 未决写回并销毁会话。
+ * - 双向同步协调器接线 —— onload 组装适配器注册表（VisimerFullAdapter × 22 +
+ *   ReadOnlyAdapter 通配兜底）；打开 Dialog 后经 initEditorSession 建立正向
+ *   （读块源码 → 剥离围栏 → 适配器渲染）与反向（onGraphChange → 防抖 → wrapFence
+ *   → updateBlock）闭环，Dialog 关闭（onDestroy）时 flush 未决写回并销毁会话。
  */
 export default class MermaidWysiwygEditorPlugin extends Plugin {
   private unregisterBlockIconTrigger: (() => void) | undefined;
   private unregisterShortcutTrigger: (() => void) | undefined;
   /** 当前快捷键设置（default | custom），save 后立即更新以即时生效。 */
   private shortcutSetting: ShortcutSetting = { mode: "default" };
-  /** 适配器注册表（T11 onload 组装；能力路由 route() 依此分派 full/readonly/unknown）。 */
+  /** 适配器注册表（onload 组装；能力路由 route() 依此分派 full/readonly/unknown）。 */
   private readonly registry = new AdapterRegistry();
   // 设置对话框实例由基类 Plugin.setting 承载（siyuan.d.ts:598）：
   // this.setting 赋值后思源插件列表即显示"设置"按钮（官方 plugin-sample 模式）。
@@ -73,13 +74,19 @@ export default class MermaidWysiwygEditorPlugin extends Plugin {
   async onload() {
     console.log("[siyuan-mermaid-wysiwyg-editor] plugin loaded");
 
-    // ---- 快捷键设置（REQ-TRIGGER-003）：读取持久化配置 + 设置界面 ----
+    // ---- 快捷键设置：读取持久化配置 + 设置界面 ----
     // this 结构兼容 ShortcutStorage（Plugin 基类自带 loadData/saveData）。
     this.shortcutSetting = await loadShortcutSetting(this);
     this.setupSettingUI();
 
-    // ---- 适配器注册表（T11）：flowchart 全编辑 + 通配只读兜底 ----
-    this.registry.register(new FlowChartAdapter());
+    // ---- 适配器注册表：Visimer 全编辑 × 22 种 + 通配只读兜底 ----
+    // DIAGRAM_TYPES 来自 @visimer/core，22 种 capability="edit"（含 flowchart/sequence/class/state/
+    // er/gantt/pie/sankey/mindmap/architecture 等）+ 1 种 capability="render"（zenuml）。
+    // 精确注册每种 edit 类型 → route() 精确匹配到 kind:"full"；
+    // ReadOnlyAdapter 通配 type="*" → 未精确注册的 render-only + 未知类型走兜底。
+    DIAGRAM_TYPES.filter((t) => t.capability === "edit").forEach((t) => {
+      this.registry.register(new VisimerFullAdapter({ type: t.id }));
+    });
     this.registry.register(new ReadOnlyAdapter());
 
     this.unregisterBlockIconTrigger = registerBlockIconTrigger({
@@ -96,7 +103,7 @@ export default class MermaidWysiwygEditorPlugin extends Plugin {
   }
 
   /**
-   * 打开编辑 Dialog 并建立双向同步会话（T9/T10 共享的打开路径）。
+   * 打开编辑 Dialog 并建立双向同步会话（block-icon / 快捷键共享的打开路径）。
    * 正向流：openEditorDialog 取画布容器 → initEditorSession（getBlockMarkdown 读块
    * 源码 → stripFence 剥离围栏 → 适配器渲染）；反向流：onGraphChange → 500ms 防抖
    * → wrapFence 包回 → updateBlock（真实实现 window.siyuan.api.block.*，小写 siyuan）。
@@ -149,7 +156,7 @@ export default class MermaidWysiwygEditorPlugin extends Plugin {
       },
       (err) => {
         // 读取/初始化失败兜底（如 getBlockMarkdown 拒绝 / stripFence fail-fast）：
-        // 错误信息渲染进画布容器（简单错误 div；T13 完善 UI），不抛未捕获异常。
+        // 错误信息渲染进画布容器（简单错误 div），不抛未捕获异常。
         console.error("[siyuan-mermaid-wysiwyg-editor] 初始化编辑会话失败", err);
         const c = handle.getContainer();
         if (c) {

@@ -1,7 +1,7 @@
 /**
- * 快捷键触发入口（REQ-TRIGGER-002 / REQ-TRIGGER-003 / D6）。
+ * 快捷键触发入口。
  *
- * 事实核实（2026-09-16，D6 + 思源官方默认快捷键表 cross-check）：
+ * 事实核实（2026-09-16，思源官方默认快捷键表 cross-check）：
  * - 默认键 `Shift+Alt+M`：思源官方默认快捷键未占用；`Alt+M`（Electron 全局
  *   快捷键"隐藏/显示窗口"，不可查询不可修改）、`Ctrl+M`（内联公式）、
  *   `Ctrl+Alt+M`（备注）、`Ctrl+Shift+M`（跳转父块上一个）均被思源默认占用，
@@ -9,14 +9,14 @@
  * - 键盘布局兼容：按住 Shift 按物理 M 键，`event.key` 在部分布局下为 'M'、
  *   在部分布局下为 'm'，故键位比较大小写不敏感。
  *
- * 触发契约（REQ-TRIGGER-002）：
+ * 触发契约：
  * - 仅当光标位于 Mermaid 代码块内时触发（场景 1）；光标不在 Mermaid 块内
  *   零副作用——不触发、不阻止默认行为（场景 2）。
  * - 光标判定：DOM selection 取 anchorNode，沿祖先向上找 `.protyle-wysiwyg`
- *   内的 code-block，复用 T9 `isMermaidCodeBlock` 判定（data-subtype="mermaid"
+ *   内的 code-block，复用 trigger.ts 里的 `isMermaidCodeBlock` 判定（data-subtype="mermaid"
  *   或内含 `code.language-mermaid`）。
  * - 配置即时生效：每次 keydown 从 settings.getEffectiveShortcut() 重新解析，
- *   save 后旧键立即失效、新键立即生效（REQ-TRIGGER-003），无需重挂监听。
+ *   save 后旧键立即失效、新键立即生效，无需重挂监听。
  */
 import { isMermaidCodeBlock } from "./trigger";
 
@@ -138,7 +138,7 @@ export function matchesShortcut(event: ShortcutKeyEvent, spec: ShortcutSpec): bo
  *
  * 行走规则：从 anchorNode（元素节点自身或文本节点父链）开始逐级上溯，
  * 遇到 `.protyle-wysiwyg` 边界即停止（不越过编辑器容器向外误判）；沿途遇到
- * `data-type="code-block"` 则立即用 T9 `isMermaidCodeBlock` 判定并返回
+ * `data-type="code-block"` 则立即用 `isMermaidCodeBlock` 判定并返回
  * （光标在代码块内，代码块是叶子容器，无需继续上溯）。
  */
 export function mermaidBlockFromNode(anchorNode: Node | null | undefined): HTMLElement | null {
@@ -148,7 +148,7 @@ export function mermaidBlockFromNode(anchorNode: Node | null | undefined): HTMLE
   let el: HTMLElement | null =
     anchorNode.nodeType === Node.ELEMENT_NODE ? (anchorNode as HTMLElement) : anchorNode.parentElement;
   while (el && !el.classList.contains("protyle-wysiwyg")) {
-    if (el.dataset.type === "code-block") {
+    if (el.dataset.type === "NodeCodeBlock" || el.dataset.type === "code-block") {
       return isMermaidCodeBlock(el) ? el : null;
     }
     el = el.parentElement;
@@ -161,7 +161,7 @@ export function mermaidBlockFromNode(anchorNode: Node | null | undefined): HTMLE
  * Mermaid 代码块内时调 onTrigger；否则零副作用（不阻止默认行为）。
  *
  * 配置即时生效：每次 keydown 从 settings.getEffectiveShortcut() 重新解析
- * （save 后旧键失效、新键生效，REQ-TRIGGER-003）。
+ * （save 后旧键失效、新键生效）。
  * 返回卸载函数（移除监听，幂等）。
  */
 export function registerShortcutTrigger(options: ShortcutTriggerOptions): () => void {
@@ -173,8 +173,7 @@ export function registerShortcutTrigger(options: ShortcutTriggerOptions): () => 
     if (!matchesShortcut(event, spec)) {
       return;
     }
-    // 光标判定（REQ-TRIGGER-002 场景 1/2）：不在 Mermaid 块内不触发、
-    // 不阻止默认行为，零副作用。
+    // 光标判定：不在 Mermaid 块内不触发、不阻止默认行为，零副作用。
     const selection = document.getSelection();
     if (!mermaidBlockFromNode(selection?.anchorNode ?? null)) {
       return;

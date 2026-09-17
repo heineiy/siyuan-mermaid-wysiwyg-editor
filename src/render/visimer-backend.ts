@@ -1,115 +1,513 @@
-import type { BackendFactory, RenderBackend, RenderBackendOptions } from "./backend";
-
 /**
- * Visimer 渲染后端（懒加载 seam 版）。
+ * Visimer 渲染后端（极简版，官方包优先）。
  *
- * npm 事实核实（2026-09-16）：`visimer` / `@inkeep/visimer` / `mermaid-wysiwyg`
- * 均未发布到 registry.npmjs.org（404）；上游仓库 https://github.com/inkeep/visimer
- * （monorepo，包名 @visimer/core / @visimer/dom v1.1.2）仍在开发中、未发布。
- * 因此本文件不依赖真实包：init 通过动态 import() 懒加载 VISIMER_MODULE，
- * 加载失败时以明确错误（VisimerLoadError）拒绝——可捕获，不产生未捕获异常。
+ * 组装链路：
+ *   1. MermaidWysiwygEditor({ code }) → headless 双向编辑引擎
+ *   2. MermaidCodeMirror(host, editor) → 官方代码面板（语法高亮 + entity 高亮 + 共享 undo）
+ *   3. MermaidCanvasView({ editor, container, mermaid, panZoom: true }) → 交互式画布
+ *   4. 原生 DOM 工具栏 → Select/Connect 工具切换 + Delete/Undo/Redo + 类型专属按钮
  *
- * 接线点（T6/T11 组装时接入真实包，二选一）：
- * 1. @visimer/dom 导出 MermaidCanvasView（ViewOptions：editor/container/mermaid/
- *    debounceMs/hooks 等），编辑器（@visimer/core）经 `editor.on('change', ...)`
- *    通知代码变更；届时在 mount 实现中创建 MermaidCanvasView，并把
- *    editor 'change' 事件接到 opts.onChange（→ onGraphChange(newCode)）。
- * 2. 或将 VISIMER_MODULE 指向一个本地薄适配模块（导出本 seam 的 mount 形状），
- *    由该模块封装 @visimer/dom 的真实 API，VisimerBackend 本体无需改动。
+ * 关键：不自己实现 textarea + bindTextPane + toolbar 逻辑——全用官方包。
+ * MermaidCodeMirror 是 @visimer/codemirror 提供的非 React 类，三行代码搞定代码面板。
  */
+import mermaid from "mermaid";
+import type { BackendFactory, RenderBackend, RenderBackendOptions } from "./backend";
+import {
+  MermaidWysiwygEditor,
+  DIAGRAM_TYPES,
+  type ShapeId,
+  type ParticipantType,
+} from "@visimer/core";
+import { MermaidCanvasView, type Tool } from "@visimer/dom";
+import { MermaidCodeMirror } from "@visimer/codemirror";
+import { EditorView } from "@codemirror/view";
 
-/** 懒加载目标模块标识：@visimer/dom 包名（npm 未发布，暂为 seam 目标）。 */
-export const VISIMER_MODULE = "@visimer/dom";
+const SHAPES: Array<{ id: ShapeId; label: string }> = [
+  { id: "rect", label: "矩形" },
+  { id: "round", label: "圆角" },
+  { id: "diamond", label: "菱形" },
+  { id: "cylinder", label: "数据库" },
+  { id: "hexagon", label: "六边形" },
+  { id: "circle", label: "圆形" },
+];
 
-/** seam 期望的模块 mount 挂载选项（真实包接线时由薄适配层对齐）。 */
-export interface VisimerMountOptions {
-  container: HTMLElement;
-  code: string;
-  onChange: (newCode: string) => void;
-}
+const PARTICIPANTS: Array<{ id: ParticipantType; label: string }> = [
+  { id: "actor", label: "Actor" },
+  { id: "participant", label: "Participant" },
+  { id: "boundary", label: "Boundary" },
+  { id: "control", label: "Control" },
+  { id: "entity", label: "Entity" },
+  { id: "database", label: "Database" },
+  { id: "collections", label: "Collections" },
+  { id: "queue", label: "Queue" },
+];
 
-/** seam 期望的 mount 返回句柄：destroy 时调用 unmount 清理画布与 DOM。 */
-export interface VisimerMountHandle {
-  unmount(): void;
-}
-
-/** 懒加载失败错误：携带模块标识，供上层（T11/T13）提示与降级。 */
-export class VisimerLoadError extends Error {
-  readonly code = "VISIMER_LOAD_FAILED" as const;
-
-  constructor(
-    readonly moduleId: string,
-    cause: unknown,
-  ) {
-    super(
-      `无法加载 Visimer 渲染模块 "${moduleId}"（npm 未发布，待 T6/T11 接线真实 @visimer/dom）：` +
-        (cause instanceof Error ? cause.message : String(cause)),
-    );
-    this.name = "VisimerLoadError";
-  }
-}
-
-/** VisimerBackend 构造选项。 */
 export interface VisimerBackendOptions {
-  /** 覆写懒加载模块标识（测试注入 / 接线用）；默认 VISIMER_MODULE。 */
-  moduleId?: string;
+  mermaidInstance?: typeof mermaid;
+  /** 是否显示代码面板（默认 true，工具栏按钮可隐藏）。 */
+  showCodePanelByDefault?: boolean;
 }
 
-/** Visimer 渲染后端：实现 RenderBackend，可被适配层注入。 */
+/** Visimer 渲染后端：极简组装 + 官方包。 */
 export class VisimerBackend implements RenderBackend {
-  private readonly moduleId: string;
-  private container: HTMLElement | null = null;
-  private onGraphChange: ((code: string) => void) | null = null;
-  private handle: VisimerMountHandle | null = null;
+  private readonly mermaidInstance: typeof mermaid;
+  private readonly showCodePanelByDefault: boolean;
+  private view: MermaidCanvasView | null = null;
+  private editor: MermaidWysiwygEditor | null = null;
+  private codeMirror: MermaidCodeMirror | null = null;
+  private offChange: (() => void) | null = null;
+  /** 代码面板容器（用于 toggle 显隐）。 */
+  private codePane: HTMLElement | null = null;
+  /** Canvas 工具栏（原生 DOM）。 */
+  private toolbar: HTMLElement | null = null;
+  /** 状态指示器。 */
+  private statusLabel: HTMLElement | null = null;
 
   constructor(options: VisimerBackendOptions = {}) {
-    this.moduleId = options.moduleId ?? VISIMER_MODULE;
+    this.mermaidInstance = options.mermaidInstance ?? mermaid;
+    this.showCodePanelByDefault = options.showCodePanelByDefault ?? true;
   }
 
   async init(code: string, opts: RenderBackendOptions): Promise<void> {
-    this.container = opts.container;
-    this.onGraphChange = opts.onGraphChange;
+    this.destroy();
 
-    let mod: unknown;
-    try {
-      mod = await import(/* @vite-ignore */ this.moduleId);
-    } catch (cause) {
-      // 懒加载失败：以明确错误拒绝（可捕获），不抛出未捕获异常。
-      throw new VisimerLoadError(this.moduleId, cause);
+    // 清空 container 内部
+    opts.container.innerHTML = "";
+
+    // 1. headless 编辑引擎
+    const editor = new MermaidWysiwygEditor({ code });
+    this.editor = editor;
+
+    // 画布编辑 → 文本回推 → sync.ts 防抖写回思源
+    this.offChange = editor.on("change", ({ code: newCode }) => {
+      opts.onGraphChange(newCode);
+    });
+
+    // 2. 构建布局：[canvas工具栏] + [canvas 左 | code 右] + [底部状态栏]
+    const layout = this.buildLayout(opts.container);
+    this.toolbar = layout.toolbar;
+    this.statusLabel = layout.statusLabel;
+
+    // 3. 官方代码面板（非 React，原生 DOM 类）
+    // 传入浅色主题扩展：显式指定明确定色，避免和思源浅色背景冲突
+    const lightTheme = EditorView.theme({
+      "&": {
+        background: "#ffffff",
+        color: "#1e293b",
+        height: "100%",
+        fontSize: "13px",
+        fontFamily: "'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace",
+      },
+      ".cm-content": {
+        padding: "8px 10px",
+      },
+      ".cm-gutters": {
+        background: "#f8fafc",
+        color: "#94a3b8",
+        border: "none",
+      },
+      ".cm-activeLine": { background: "#f1f5f9" },
+      ".cm-activeLineGutter": { background: "#e2e8f0" },
+      ".cm-selectionBackground": { background: "#bfdbfe !important" },
+      "&.cm-focused .cm-selectionBackground": { background: "#93c5fd !important" },
+    }, { dark: false });
+    this.codePane = layout.codePane;
+    this.codeMirror = new MermaidCodeMirror(layout.codeMirrorHost, editor, [lightTheme]);
+    if (!this.showCodePanelByDefault) {
+      layout.codePane.style.display = "none";
     }
 
-    const mount = (mod as { mount?: unknown }).mount;
-    if (typeof mount !== "function") {
-      throw new VisimerLoadError(
-        this.moduleId,
-        new Error("模块已加载但未导出 seam 契约的 mount，请按 T6/T11 接线真实 @visimer/dom"),
-      );
-    }
-    this.handle = (mount as (o: VisimerMountOptions) => VisimerMountHandle)({
-      container: opts.container,
-      code,
-      onChange: (newCode: string) => this.onGraphChange?.(newCode),
+    // 4. 交互式画布
+    const view = new MermaidCanvasView({
+      editor,
+      container: layout.canvasSlot,
+      mermaid: this.mermaidInstance as unknown as ConstructorParameters<typeof MermaidCanvasView>[0]["mermaid"],
+      mermaidConfig: { startOnLoad: false, securityLevel: "loose" },
+      panZoom: true,
+      readOnly: false,
+      accentColor: "#2b6cb0",
+      defaultEdge: { arrowEnd: "arrow" },
+      debounceMs: 200,
+    });
+    this.view = view;
+    view.setTool("select");
+
+    // 5. 在 toolbar 最右侧加代码面板 toggle 按钮（永远在工具栏上，不会随 codePane 隐藏）
+    const toggleCodeBtn = document.createElement("button");
+    Object.assign(toggleCodeBtn.style, {
+      fontSize: "12px",
+      padding: "4px 10px",
+      border: "1px solid #cbd5e1",
+      borderRadius: "6px",
+      background: "#eef2ff",
+      borderColor: "#2b6cb0",
+      color: "#2b6cb0",
+      cursor: "pointer",
+      fontFamily: "inherit",
+      marginLeft: "4px",
+    });
+    toggleCodeBtn.textContent = "◀ 隐藏代码";
+    toggleCodeBtn.title = "切换 Mermaid 源码面板";
+    toggleCodeBtn.addEventListener("click", () => {
+      if (!this.codePane) {
+        return;
+      }
+      const visible = this.codePane.style.display !== "none";
+      if (visible) {
+        this.codePane.style.display = "none";
+        toggleCodeBtn.textContent = "▶ 显示代码";
+        Object.assign(toggleCodeBtn.style, {
+          background: "#ffffff",
+          borderColor: "#cbd5e1",
+          color: "#475569",
+        });
+      } else {
+        this.codePane.style.display = "flex";
+        toggleCodeBtn.textContent = "◀ 隐藏代码";
+        Object.assign(toggleCodeBtn.style, {
+          background: "#eef2ff",
+          borderColor: "#2b6cb0",
+          color: "#2b6cb0",
+        });
+      }
+    });
+
+    // 6. 构建 canvas 工具栏（Select/Connect/+Node/Delete/Undo/Redo）
+    this.buildCanvasToolbar(layout.toolbar, editor, view, layout);
+    // toggle 按钮加到最右（buildCanvasToolbar 会加 spacer push 到右）
+    layout.toolbar.appendChild(toggleCodeBtn);
+
+    // 6. 状态指示器订阅 render 事件
+    view.on("render", () => {
+      if (!this.statusLabel) {
+        return;
+      }
+      if (view.renderError) {
+        this.statusLabel.textContent = "✗ " + view.renderError.replace(/\n/g, " ").slice(0, 50);
+        this.statusLabel.style.color = "#dc2626";
+      } else {
+        this.statusLabel.textContent = "✓ mermaid parse ok";
+        this.statusLabel.style.color = "#16a34a";
+      }
     });
   }
 
-  destroy(): void {
-    if (this.handle) {
-      try {
-        this.handle.unmount();
-      } finally {
-        this.handle = null;
+  /**
+   * container 内建完整 flex 布局（原生 DOM，不依赖 React/Vue）。
+   *
+   * 结构：
+   *   container (flex column)
+   *   ├── .mw-canvas-toolbar   ← 画布工具栏（Select/Connect/+Node/...）
+   *   ├── .mw-body             ← flex row
+   *   │   ├── .mw-canvas-slot  ← MermaidCanvasView 挂这里（flex:1）
+   *   │   └── .mw-code-pane    ← MermaidCodeMirror 挂这里（flex:0 0 40%）
+   *   └── .mw-statusbar        ← ✓/✗ 状态
+   */
+  private buildLayout(container: HTMLElement) {
+    container.style.display = "flex";
+    container.style.flexDirection = "column";
+    container.style.height = "100%";
+    container.style.minHeight = "0";
+
+    // Canvas 工具栏
+    const toolbar = document.createElement("div");
+    toolbar.className = "mw-canvas-toolbar";
+    Object.assign(toolbar.style, {
+      display: "flex",
+      alignItems: "center",
+      gap: "4px",
+      padding: "4px 8px",
+      borderBottom: "1px solid #e2e8f0",
+      background: "#ffffff",
+      flex: "0 0 auto",
+      flexWrap: "wrap",
+    });
+
+    // 主体
+    const body = document.createElement("div");
+    body.className = "mw-body";
+    Object.assign(body.style, {
+      display: "flex",
+      flex: "1 1 auto",
+      minHeight: "0",
+      overflow: "hidden",
+    });
+
+    // Canvas slot
+    const canvasSlot = document.createElement("div");
+    canvasSlot.className = "mw-canvas-slot";
+    Object.assign(canvasSlot.style, {
+      flex: "1 1 auto",
+      minHeight: "0",
+      minWidth: "0",
+    });
+
+    // Code pane（浅色主题，和思源融合）
+    const codePane = document.createElement("div");
+    codePane.className = "mw-code-pane";
+    Object.assign(codePane.style, {
+      flex: "0 0 40%",
+      display: "flex",
+      flexDirection: "column",
+      borderLeft: "1px solid #e2e8f0",
+      minWidth: "0",
+      background: "#ffffff",
+    });
+
+    // Code pane 头部（只放标题，toggle 按钮移到 canvas toolbar 上）
+    const codeHeader = document.createElement("div");
+    Object.assign(codeHeader.style, {
+      display: "flex",
+      alignItems: "center",
+      gap: "8px",
+      padding: "4px 10px",
+      background: "#f1f5f9",
+      color: "#475569",
+      fontSize: "12px",
+      fontWeight: "600",
+      flex: "0 0 auto",
+      borderBottom: "1px solid #e2e8f0",
+    });
+    codeHeader.textContent = "📝 Mermaid Source";
+
+    const codeMirrorHost = document.createElement("div");
+    codeMirrorHost.className = "mw-codemirror-host";
+    Object.assign(codeMirrorHost.style, {
+      flex: "1 1 auto",
+      minHeight: "0",
+      overflow: "hidden",
+    });
+
+    codePane.appendChild(codeHeader);
+    codePane.appendChild(codeMirrorHost);
+
+    // 状态条
+    const statusBar = document.createElement("div");
+    Object.assign(statusBar.style, {
+      display: "flex",
+      alignItems: "center",
+      padding: "2px 10px",
+      background: "#f8fafc",
+      borderTop: "1px solid #e2e8f0",
+      fontSize: "11px",
+      color: "#64748b",
+      flex: "0 0 auto",
+    });
+    const statusLabel = document.createElement("span");
+    statusLabel.textContent = "● 初始化...";
+    statusBar.appendChild(statusLabel);
+
+    body.appendChild(canvasSlot);
+    body.appendChild(codePane);
+    container.appendChild(toolbar);
+    container.appendChild(body);
+    container.appendChild(statusBar);
+
+    return { toolbar, canvasSlot, codePane, codeMirrorHost, statusLabel };
+  }
+
+  /**
+   * 原生 DOM 画布工具栏（参考 playground React 版）。
+   * Select | Connect | +Node/Direction | Delete | Undo | Redo
+   */
+  private buildCanvasToolbar(
+    toolbar: HTMLElement,
+    editor: MermaidWysiwygEditor,
+    view: MermaidCanvasView,
+    layout: { canvasSlot: HTMLElement }
+  ): void {
+    const btnStyle: Record<string, string> = {
+      fontSize: "12px",
+      padding: "4px 10px",
+      border: "1px solid #cbd5e1",
+      borderRadius: "6px",
+      background: "#ffffff",
+      color: "#475569",
+      cursor: "pointer",
+      fontFamily: "inherit",
+    };
+
+    const makeBtn = (text: string, onClick: () => void): HTMLButtonElement => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      Object.assign(btn.style, btnStyle);
+      btn.textContent = text;
+      btn.addEventListener("click", onClick);
+      return btn;
+    };
+
+    const setActiveBtn = (active: HTMLButtonElement) => {
+      for (const child of toolbar.children) {
+        if (child instanceof HTMLButtonElement) {
+          Object.assign(child.style, btnStyle);
+        }
       }
+      Object.assign(active.style, btnStyle, {
+        background: "#2b6cb0",
+        borderColor: "#2b6cb0",
+        color: "#ffffff",
+      });
+    };
+
+    // Select
+    const selectBtn = makeBtn("Select", () => {
+      view.setTool("select");
+      setActiveBtn(selectBtn);
+    });
+    toolbar.appendChild(selectBtn);
+
+    // Connect
+    const connectBtn = makeBtn("Connect", () => {
+      view.setTool("connect");
+      setActiveBtn(connectBtn);
+    });
+    toolbar.appendChild(connectBtn);
+
+    // 分隔
+    const sep = document.createElement("span");
+    sep.textContent = "|";
+    Object.assign(sep.style, { color: "#cbd5e1", margin: "0 4px" });
+    toolbar.appendChild(sep);
+
+    // 类型专属按钮（动态出现）
+    const typeToolsHost = document.createElement("span");
+    toolbar.appendChild(typeToolsHost);
+
+    // Delete（需要 selection）
+    const deleteBtn = makeBtn("🗑 Delete", () => {
+      if (editor.selection.length > 0) {
+        editor.deleteEntities(editor.selection);
+      }
+    });
+    toolbar.appendChild(deleteBtn);
+
+    // spacer
+    const spacer = document.createElement("span");
+    Object.assign(spacer.style, { flex: "1 1 auto" });
+    toolbar.appendChild(spacer);
+
+    // Undo
+    const undoBtn = makeBtn("↶ Undo", () => editor.undo());
+    toolbar.appendChild(undoBtn);
+
+    // Redo
+    const redoBtn = makeBtn("↷ Redo", () => editor.redo());
+    toolbar.appendChild(redoBtn);
+
+    // 初始激活 Select
+    setActiveBtn(selectBtn);
+
+    // 根据图类型动态更新工具栏按钮
+    const updateTypeTools = () => {
+      typeToolsHost.innerHTML = "";
+      const typeInfo = editor.result.typeInfo;
+      const typeId = typeInfo?.id;
+
+      if (typeId === "flowchart" || typeId === "state") {
+        // +Node select + 方向 select
+        const nodeSelect = document.createElement("select");
+        Object.assign(nodeSelect.style, btnStyle, { padding: "3px 6px" });
+        const defaultOpt = document.createElement("option");
+        defaultOpt.textContent = "+ Node...";
+        nodeSelect.appendChild(defaultOpt);
+        SHAPES.forEach((s) => {
+          const opt = document.createElement("option");
+          opt.value = s.id;
+          opt.textContent = s.label;
+          nodeSelect.appendChild(opt);
+        });
+        nodeSelect.addEventListener("change", () => {
+          const v = nodeSelect.value as ShapeId;
+          if (v) {
+            view.addNode(v);
+          }
+          nodeSelect.value = "";
+        });
+        typeToolsHost.appendChild(nodeSelect);
+
+        if (typeId === "flowchart") {
+          const dirSelect = document.createElement("select");
+          Object.assign(dirSelect.style, btnStyle, { padding: "3px 6px" });
+          ["TD", "LR", "BT", "RL"].forEach((d) => {
+            const opt = document.createElement("option");
+            opt.value = d;
+            opt.textContent = d;
+            dirSelect.appendChild(opt);
+          });
+          const currentDir = (editor.result.flowchart?.direction ?? "TD").toUpperCase();
+          dirSelect.value = currentDir;
+          dirSelect.addEventListener("change", () => {
+            editor.dispatch({ type: "setDirection", direction: dirSelect.value });
+          });
+          typeToolsHost.appendChild(dirSelect);
+        }
+      } else if (typeId === "sequence") {
+        const partSelect = document.createElement("select");
+        Object.assign(partSelect.style, btnStyle, { padding: "3px 6px" });
+        const defaultOpt = document.createElement("option");
+        defaultOpt.textContent = "+ Participant...";
+        partSelect.appendChild(defaultOpt);
+        PARTICIPANTS.forEach((p) => {
+          const opt = document.createElement("option");
+          opt.value = p.id;
+          opt.textContent = p.label;
+          partSelect.appendChild(opt);
+        });
+        partSelect.addEventListener("change", () => {
+          if (partSelect.value) {
+            editor.dispatch({ type: "seq.addParticipant", ptype: partSelect.value as ParticipantType });
+          }
+          partSelect.value = "";
+        });
+        typeToolsHost.appendChild(partSelect);
+      } else if (typeId === "class") {
+        const clsBtn = makeBtn("+ Class", () => editor.dispatch({ type: "cl.addClass" }));
+        typeToolsHost.appendChild(clsBtn);
+      } else if (typeId === "er") {
+        const entBtn = makeBtn("+ Entity", () => editor.dispatch({ type: "er.addEntity" }));
+        typeToolsHost.appendChild(entBtn);
+      }
+    };
+
+    updateTypeTools();
+
+    // 监听类型变化（如果图类型切换了）
+    editor.on("change", () => updateTypeTools());
+
+    // Update undo/redo disabled state
+    const updateUndoRedo = () => {
+      undoBtn.disabled = !editor.canUndo;
+      redoBtn.disabled = !editor.canRedo;
+      deleteBtn.disabled = editor.selection.length === 0;
+    };
+    updateUndoRedo();
+    editor.on("change", () => updateUndoRedo());
+  }
+
+  destroy(): void {
+    if (this.codeMirror) {
+      this.codeMirror.destroy();
+      this.codeMirror = null;
     }
-    this.onGraphChange = null;
-    this.container = null;
+    if (this.offChange) {
+      this.offChange();
+      this.offChange = null;
+    }
+    if (this.view) {
+      this.view.destroy();
+      this.view = null;
+    }
+    this.editor = null;
+    this.toolbar = null;
+    this.codePane = null;
+    this.statusLabel = null;
   }
 }
-
-/** 工厂：以 "visimer" 为 id 的可注入后端（REQ-BACKEND-001 组装入口）。 */
-export const createVisimerBackend = (options: VisimerBackendOptions = {}): RenderBackend =>
-  new VisimerBackend(options);
 
 export const visimerBackendFactory: BackendFactory = {
   id: "visimer",
   create: () => new VisimerBackend(),
 };
+
+// 重新导出 DIAGRAM_TYPES 给上层 index.ts 注册用
+export { DIAGRAM_TYPES };
