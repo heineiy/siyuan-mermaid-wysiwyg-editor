@@ -7,6 +7,24 @@
 [![Visimer](https://img.shields.io/badge/Visimer-1.1.x-7c3aed)](https://github.com/visimer/visimer)
 [![License](https://img.shields.io/badge/License-MIT-green)](./LICENSE)
 
+## 🙏 Acknowledgements
+
+This plugin's visual editing capability is **entirely built on top of [Visimer](https://github.com/inkeep/visimer)** ——
+a headless engine + interactive canvas framework for building Mermaid WYSIWYG editors. Visimer provides:
+
+- **`@visimer/core`** — Pure TypeScript headless editing engine: compiles Mermaid text into an editable AST and back (the key to bidirectional sync)
+- **`@visimer/dom`** — Interactive canvas (`MermaidCanvasView`) with Select/Connect tools, popover property panels, Plus buttons, panZoom, and auto-fit
+- **`@visimer/codemirror`** — Official code panel with syntax highlighting, entity highlighting, and shared undo stack
+
+Visimer is developed by the [inkeep](https://github.com/inkeep) team. Repository:
+[https://github.com/inkeep/visimer](https://github.com/inkeep/visimer)
+
+**None of this would be possible without Visimer.** This plugin only adapts Visimer to the Siyuan plugin ecosystem:
+- Siyuan hotkey system (`plugin.addCommand`)
+- Siyuan block-icon menu (`click-blockicon` event)
+- Siyuan kernel API (`fetchSyncPost` for block read/write)
+- Native DOM toolbar (Select / Connect / +Node / Undo / Redo)
+
 ## ✨ Features
 
 ### 🎨 Visual Editing (22 Mermaid Diagram Types)
