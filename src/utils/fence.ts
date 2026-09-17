@@ -61,3 +61,23 @@ export function wrapFence(code: string): string {
   const trimmed = code.replace(/\r?\n$/, "");
   return `${OPEN_FENCE}\n${trimmed}\n${CLOSE_FENCE}`;
 }
+
+/**
+ * 剥离 kramdown 尾部的块级 IAL（{: id="..." updated="..."}）。
+ *
+ * 思源内核 API `/api/block/getBlockKramdown` 返回的 kramdown 在代码块围栏后
+ * 携带块属性 IAL 行（实测 3.8.3：`` ...\n```\n{: id="..." updated="..."} ``）；
+ * stripFence 要求输入以结尾围栏收束，故先剥离 IAL 再喂入。
+ *
+ * 仅当最后一行（trim 后）以 "{:" 开头且以 "}" 结尾时剥离，防止误删正文中
+ * 形如 {...} 的内容（如 Mermaid 判断节点 `B{判断}` 不满足该形态）。
+ */
+export function stripKramdownIal(kramdown: string): string {
+  const text = kramdown.replace(/\r\n/g, "\n");
+  const lastNl = text.lastIndexOf("\n");
+  const lastLine = (lastNl === -1 ? text : text.slice(lastNl + 1)).trim();
+  if (text.endsWith("}") && lastLine.startsWith("{:")) {
+    return lastNl === -1 ? "" : text.slice(0, lastNl);
+  }
+  return kramdown;
+}

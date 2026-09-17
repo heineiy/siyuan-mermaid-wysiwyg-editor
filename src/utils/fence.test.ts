@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { stripFence, wrapFence } from "./fence";
+import { stripFence, stripKramdownIal, wrapFence } from "./fence";
 
 /**
  * 围栏剥离/包回工具测试（REQ-READ-001 / design.md 数据约束）。
@@ -139,5 +139,31 @@ describe("wrapFence 往返：尾随行终止符的规范化（文档化规则）
 
   it("code 含真实尾随空行（≥2 换行）→ 往返后空行语义保留（恰好一个终止符被规范化）", () => {
     expect(stripFence(wrapFence("flowchart LR\n\n"))).toBe("flowchart LR\n");
+  });
+});
+
+describe("stripKramdownIal（思源 getBlockKramdown 尾部 IAL 剥离）", () => {
+  it("剥离代码块后的块级 IAL 行（3.8.3 实测形态）", () => {
+    const kramdown =
+      '```mermaid\nflowchart LR\n  A[开始] --> B{判断}\n```\n{: id="20260916172156-y2qif38" updated="20260916172156"}';
+    expect(stripKramdownIal(kramdown)).toBe(
+      "```mermaid\nflowchart LR\n  A[开始] --> B{判断}\n```",
+    );
+  });
+
+  it("无 IAL → 原样返回", () => {
+    const md = "```mermaid\nflowchart LR\n  A-->B\n```";
+    expect(stripKramdownIal(md)).toBe(md);
+  });
+
+  it("正文含 Mermaid 判断节点 {判断}（非 IAL 形态）→ 不误删", () => {
+    const md = "```mermaid\nflowchart LR\n  A --> B{x}\n```";
+    expect(stripKramdownIal(md)).toBe(md);
+  });
+
+  it("剥离 IAL 后可直接 stripFence（联调链路闭环）", () => {
+    const kramdown =
+      '```mermaid\nflowchart LR\n  A[开始] --> B{判断}\n```\n{: id="x" updated="y"}';
+    expect(stripFence(stripKramdownIal(kramdown))).toBe("flowchart LR\n  A[开始] --> B{判断}");
   });
 });
