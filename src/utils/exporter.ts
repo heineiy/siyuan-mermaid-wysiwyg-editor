@@ -60,7 +60,7 @@ export class Exporter {
    */
   async exportSVG(): Promise<Blob> {
     const code = this.opts.getCode();
-    if (!code.trim()) throw new Error("Mermaid 代码为空");
+    if (!code.trim()) throw new Error("Mermaid code is empty");
     return withTempContainer(async (container) => {
       const { svg } = await this.opts.mermaid.render(nextRenderId(), code, container);
       return new Blob([svg], { type: "image/svg+xml" });
@@ -75,7 +75,7 @@ export class Exporter {
    */
   async exportPNG(scale: 1 | 2 | 3 = 2): Promise<Blob> {
     const code = this.opts.getCode();
-    if (!code.trim()) throw new Error("Mermaid 代码为空");
+    if (!code.trim()) throw new Error("Mermaid code is empty");
     return withTempContainer(async (container) => {
       const { svg } = await this.opts.mermaid.render(nextRenderId(), code, container);
       return Exporter.svgToPngBlob(svg, scale);

@@ -49,15 +49,16 @@ export function buildExportDropdown(opts: ExportDropdownOptions): HTMLElement {
   const host = document.createElement("div");
   Object.assign(host.style, { position: "relative", display: "inline-block" });
 
+  let btnOpen = false;
   const btn = document.createElement("button");
   btn.type = "button";
-  btn.textContent = "导出 ▾";
+  btn.textContent = "Export ▾";
   Object.assign(btn.style, btnBase);
-  // hover 态：浅灰底
-  btn.addEventListener("mouseenter", () => (btn.style.background = "#f1f5f9"));
-  btn.addEventListener("mouseleave", () => (btn.style.background = "#ffffff"));
+  // hover/active 态：浅灰底；打开时保持高亮
+  btn.addEventListener("mouseenter", () => { if (!btnOpen) btn.style.background = "#f1f5f9"; });
+  btn.addEventListener("mouseleave", () => { if (!btnOpen) btn.style.background = "#ffffff"; });
   btn.addEventListener("mousedown", () => (btn.style.background = "#e2e8f0"));
-  btn.addEventListener("mouseup", () => (btn.style.background = "#f1f5f9"));
+  btn.addEventListener("mouseup", () => (btn.style.background = btnOpen ? "#eef2ff" : "#ffffff"));
 
   const menu = document.createElement("div");
   Object.assign(menu.style, {
@@ -72,7 +73,7 @@ export function buildExportDropdown(opts: ExportDropdownOptions): HTMLElement {
     if (!statusLabel) return;
     statusLabel.classList.remove("mw-status-ok");
     statusLabel.classList.add("mw-status-error");
-    statusLabel.textContent = `导出失败：${msg}`;
+    statusLabel.textContent = `Export failed: ${msg}`;
   };
 
   const mkItem = (label: string, action: () => Promise<void>, danger = false) => {
@@ -140,23 +141,26 @@ export function buildExportDropdown(opts: ExportDropdownOptions): HTMLElement {
     else await exp.copyPNG();
   };
 
-  // 下载组
-  mkItem("下载 PNG (Retina 2x)", () => runExport("png", 2));
-  mkItem("下载 PNG (高清 3x)", () => runExport("png", 3));
-  mkItem("下载 SVG 矢量", () => runExport("svg"));
-  // 分隔
+  // Download group
+  mkItem("Download PNG (Retina 2x)", () => runExport("png", 2));
+  mkItem("Download PNG (HD 3x)", () => runExport("png", 3));
+  mkItem("Download SVG", () => runExport("svg"));
+  // Divider
   menu.appendChild(divider);
-  // 剪贴板组
-  mkItem("复制 PNG 到剪贴板", () => runCopy("png"));
-  mkItem("复制 SVG 到剪贴板", () => runCopy("svg"));
+  // Clipboard group
+  mkItem("Copy PNG to clipboard", () => runCopy("png"));
+  mkItem("Copy SVG to clipboard", () => runCopy("svg"));
 
   btn.addEventListener("click", (e) => {
     e.stopPropagation();
-    menu.style.display = menu.style.display === "none" ? "flex" : "none";
+    btnOpen = menu.style.display === "none";
+    menu.style.display = btnOpen ? "flex" : "none";
+    btn.style.background = btnOpen ? "#eef2ff" : "#ffffff";
   });
   const closeOnOutside = (e: MouseEvent) => {
     if (!host.contains(e.target as Node)) {
       menu.style.display = "none";
+      btnOpen = false;
       btn.style.background = "#ffffff";
     }
   };

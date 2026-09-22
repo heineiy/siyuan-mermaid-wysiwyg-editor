@@ -135,43 +135,30 @@ export class VisimerBackend implements RenderBackend {
 
     // 5. 在 toolbar 最右侧加代码面板 toggle 按钮（永远在工具栏上，不会随 codePane 隐藏）
     const toggleCodeBtn = document.createElement("button");
+    toggleCodeBtn.type = "button";
+    toggleCodeBtn.title = "Toggle the Mermaid source panel";
     Object.assign(toggleCodeBtn.style, {
-      fontSize: "12px",
-      padding: "4px 10px",
-      border: "1px solid #cbd5e1",
-      borderRadius: "6px",
-      background: "#eef2ff",
-      borderColor: "#2b6cb0",
-      color: "#2b6cb0",
-      cursor: "pointer",
-      fontFamily: "inherit",
-      marginLeft: "4px",
+      fontSize: "12px", padding: "4px 10px",
+      border: "1px solid #cbd5e1", borderRadius: "6px",
+      background: "#ffffff", color: "#475569",
+      cursor: "pointer", fontFamily: "inherit", marginLeft: "4px",
     });
-    toggleCodeBtn.textContent = "◀ 隐藏代码";
-    toggleCodeBtn.title = "切换 Mermaid 源码面板";
+    const toggleCodeBtnSet = (shown: boolean) => {
+      toggleCodeBtn.textContent = shown ? "Hide Code" : "Show Code";
+      Object.assign(toggleCodeBtn.style, (
+        shown
+          ? { background: "#2b6cb0", borderColor: "#2b6cb0", color: "#ffffff" }
+          : { background: "#ffffff", borderColor: "#cbd5e1", color: "#475569" }
+      ));
+    };
     toggleCodeBtn.addEventListener("click", () => {
-      if (!this.codePane) {
-        return;
-      }
-      const visible = this.codePane.style.display !== "none";
-      if (visible) {
-        this.codePane.style.display = "none";
-        toggleCodeBtn.textContent = "▶ 显示代码";
-        Object.assign(toggleCodeBtn.style, {
-          background: "#ffffff",
-          borderColor: "#cbd5e1",
-          color: "#475569",
-        });
-      } else {
-        this.codePane.style.display = "flex";
-        toggleCodeBtn.textContent = "◀ 隐藏代码";
-        Object.assign(toggleCodeBtn.style, {
-          background: "#eef2ff",
-          borderColor: "#2b6cb0",
-          color: "#2b6cb0",
-        });
-      }
+      if (!this.codePane) return;
+      const shown = this.codePane.style.display !== "none";
+      this.codePane.style.display = shown ? "none" : "flex";
+      toggleCodeBtnSet(!shown);
     });
+    // 初始：代码面板显示 → 按钮为选中态（蓝色高亮），与 Select 等工具一致
+    toggleCodeBtnSet(true);
 
     // 6. 构建 canvas 工具栏（Select/Connect/+Node/Delete/Undo/Redo）
     this.buildCanvasToolbar(layout.toolbar, editor, view, layout);
@@ -388,7 +375,8 @@ export class VisimerBackend implements RenderBackend {
     toolbar.appendChild(spacer);
 
     // --- 导出 dropdown（共用 exporter-ui 工厂函数） ---
-    const codeFn = () => (editor as any).getCode?.() ?? "";
+    // 取 editor 的当前 mermaid 源码。editor 无 getCode()，正确 API 是 code getter（或 getText()）。
+    const codeFn = () => (editor as any).code ?? (editor as any).getText?.() ?? "";
     const typeFn = () => (editor as any).result?.typeInfo?.id ?? "diagram";
     toolbar.appendChild(buildExportDropdown({ getCode: codeFn, getType: typeFn, statusLabel: this.statusLabel }));
 

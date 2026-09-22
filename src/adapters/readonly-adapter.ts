@@ -145,21 +145,21 @@ export class ReadOnlyAdapter implements DiagramAdapter {
       flex: "0 0 auto",
     });
 
-    // toggle 按钮
+    // toggle 按钮（初始显示代码 → 选中态蓝色，与 Visimer 工具按钮一致）
     const toggleBtn = document.createElement("button");
     toggleBtn.type = "button";
+    toggleBtn.title = "Toggle the source textarea";
     Object.assign(toggleBtn.style, {
       fontSize: "12px",
       padding: "4px 10px",
-      border: "1px solid #cbd5e1",
+      border: "1px solid #2b6cb0",
       borderRadius: "6px",
-      background: "#eef2ff", // 默认显示代码 → 按钮高亮
-      borderColor: "#2b6cb0",
-      color: "#2b6cb0",
+      background: "#2b6cb0",
+      color: "#ffffff",
       cursor: "pointer",
       fontFamily: "inherit",
     });
-    toggleBtn.textContent = "◀ 隐藏代码";
+    toggleBtn.textContent = "Hide Code";
 
     // 状态指示器
     const statusLabel = document.createElement("span");
@@ -168,7 +168,7 @@ export class ReadOnlyAdapter implements DiagramAdapter {
       color: "#64748b",
       marginLeft: "auto", // 推到工具栏最右
     });
-    statusLabel.textContent = "● 渲染中...";
+    statusLabel.textContent = "Rendering...";
 
     toolbar.appendChild(toggleBtn);
     toolbar.appendChild(statusLabel);
@@ -237,16 +237,12 @@ export class ReadOnlyAdapter implements DiagramAdapter {
       textPaneVisible = !textPaneVisible;
       if (textPaneVisible) {
         textPane.style.display = "flex";
-        toggleBtn.textContent = "◀ 隐藏代码";
-        toggleBtn.style.background = "#eef2ff";
-        toggleBtn.style.borderColor = "#2b6cb0";
-        toggleBtn.style.color = "#2b6cb0";
+        toggleBtn.textContent = "Hide Code";
+        Object.assign(toggleBtn.style, { background: "#2b6cb0", borderColor: "#2b6cb0", color: "#ffffff" });
       } else {
         textPane.style.display = "none";
-        toggleBtn.textContent = "▶ 显示代码";
-        toggleBtn.style.background = "#ffffff";
-        toggleBtn.style.borderColor = "#cbd5e1";
-        toggleBtn.style.color = "#475569";
+        toggleBtn.textContent = "Show Code";
+        Object.assign(toggleBtn.style, { background: "#ffffff", borderColor: "#cbd5e1", color: "#475569" });
       }
     });
 
@@ -260,11 +256,11 @@ export class ReadOnlyAdapter implements DiagramAdapter {
     }
     switch (status) {
       case "rendering":
-        this.statusLabel.textContent = "● 渲染中...";
+        this.statusLabel.textContent = "Rendering...";
         this.statusLabel.style.color = "#64748b";
         break;
       case "ok":
-        this.statusLabel.textContent = "✓ 语法正确";
+        this.statusLabel.textContent = "Syntax valid";
         this.statusLabel.style.color = "#16a34a";
         break;
       case "error": {
@@ -331,7 +327,7 @@ export class ReadOnlyAdapter implements DiagramAdapter {
     const title = document.createElement("div");
     title.style.fontWeight = "600";
     title.style.marginBottom = "8px";
-    title.textContent = "⚠ Mermaid 语法错误";
+    title.textContent = "⚠ Mermaid syntax error";
     const body = document.createElement("div");
     body.style.fontFamily = "'JetBrains Mono', 'SF Mono', Menlo, monospace";
     body.style.fontSize = "12px";
@@ -344,7 +340,7 @@ export class ReadOnlyAdapter implements DiagramAdapter {
     hint.style.marginTop = "12px";
     hint.style.fontSize = "12px";
     hint.style.color = "#64748b";
-    hint.textContent = "← 在左侧 textarea 里修正代码，语法正确后自动保存回思源";
+    hint.textContent = "Fix the code in the left textarea; it auto-saves when valid";
     box.appendChild(title);
     box.appendChild(body);
     box.appendChild(hint);

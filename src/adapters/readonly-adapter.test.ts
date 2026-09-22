@@ -125,7 +125,7 @@ describe("ReadOnlyAdapter：渲染失败降级（T13 接线点）", () => {
     expect(container.innerHTML).toContain("mw-code-editor"); // textarea
     expect(container.innerHTML).toContain("mw-preview-slot");
     // preview-slot 里有错误提示（红框）
-    expect(container.innerHTML).toContain("⚠ Mermaid 语法错误");
+    expect(container.innerHTML).toContain("⚠ Mermaid syntax error");
     expect(container.innerHTML).toContain("parse failed: unknown diagram");
   });
 
