@@ -11,6 +11,7 @@
 
 import mermaid from "mermaid";
 import { Exporter } from "./exporter";
+import { t } from "./i18n";
 
 export interface ExportDropdownOptions {
   /** 获取当前 Mermaid 源码 */
@@ -34,16 +35,18 @@ export interface ExportDropdownOptions {
 export function buildExportDropdown(opts: ExportDropdownOptions): HTMLElement {
   const { getCode, getType, statusLabel } = opts;
 
-  // 与 Visimer makeBtn 样式对齐
+  // 与 Visimer 工具栏按钮样式对齐；padding/min-width 留余量，避免中英切换文字被遮挡
   const btnBase: Record<string, string> = {
     fontSize: "12px",
-    padding: "4px 10px",
+    padding: "4px 12px",
+    minWidth: "64px",
     border: "1px solid #cbd5e1",
     borderRadius: "6px",
     background: "#ffffff",
     color: "#475569",
     cursor: "pointer",
     fontFamily: "inherit",
+    whiteSpace: "nowrap",
   };
 
   const host = document.createElement("div");
@@ -52,7 +55,7 @@ export function buildExportDropdown(opts: ExportDropdownOptions): HTMLElement {
   let btnOpen = false;
   const btn = document.createElement("button");
   btn.type = "button";
-  btn.textContent = "Export ▾";
+  btn.textContent = `${t("export.label")} ▾`;
   Object.assign(btn.style, btnBase);
   // hover/active 态：浅灰底；打开时保持高亮
   btn.addEventListener("mouseenter", () => { if (!btnOpen) btn.style.background = "#f1f5f9"; });
@@ -64,9 +67,9 @@ export function buildExportDropdown(opts: ExportDropdownOptions): HTMLElement {
   Object.assign(menu.style, {
     position: "absolute", top: "100%", right: "0", marginTop: "4px",
     background: "#ffffff", border: "1px solid #cbd5e1", borderRadius: "6px",
-    boxShadow: "0 6px 20px rgba(0,0,0,0.12)", minWidth: "180px",
+    boxShadow: "0 6px 20px rgba(0,0,0,0.12)", minWidth: "200px",
     zIndex: "1000", display: "none", flexDirection: "column",
-    padding: "4px 0", overflow: "hidden",
+    padding: "4px 0", overflow: "hidden", whiteSpace: "nowrap",
   });
 
   const showError = (err: unknown) => {
@@ -75,7 +78,7 @@ export function buildExportDropdown(opts: ExportDropdownOptions): HTMLElement {
     const stack = err instanceof Error ? err.stack : undefined;
     statusLabel.classList.remove("mw-status-ok");
     statusLabel.classList.add("mw-status-error");
-    statusLabel.textContent = `Export failed: ${msg}`;
+    statusLabel.textContent = `${t("export.failed")}: ${msg}`;
     if (stack) {
       // hover 状态栏可看完整堆栈；同步打 console 便于用户从 DevTools 复制
       statusLabel.title = stack;
@@ -148,13 +151,13 @@ export function buildExportDropdown(opts: ExportDropdownOptions): HTMLElement {
   };
 
   // Download group
-  mkItem("Download PNG (Retina 2x)", () => runExport("png", 2));
-  mkItem("Download PNG (HD 3x)", () => runExport("png", 3));
-  mkItem("Download SVG", () => runExport("svg"));
+  mkItem(t("export.downloadPng2x"), () => runExport("png", 2));
+  mkItem(t("export.downloadPng3x"), () => runExport("png", 3));
+  mkItem(t("export.downloadSvg"), () => runExport("svg"));
   // Divider
   menu.appendChild(divider);
   // Clipboard group：复制统一为 PNG 图片（svg+xml 在多数应用粘贴不是图片，copyAsImage 也只复制 PNG）
-  mkItem("Copy as PNG image", () => runCopy("png"));
+  mkItem(t("export.copyPng"), () => runCopy("png"));
 
   btn.addEventListener("click", (e) => {
     e.stopPropagation();

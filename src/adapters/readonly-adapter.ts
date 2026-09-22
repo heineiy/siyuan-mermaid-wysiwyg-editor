@@ -33,6 +33,7 @@
 import type { AdapterOptions, DiagramAdapter } from "./registry";
 import mermaid from "mermaid";
 import { buildExportDropdown } from "../utils/exporter-ui";
+import { t } from "../utils/i18n";
 
 /** 渲染结果：只读 SVG 字符串。 */
 export interface ReadonlyRenderResult {
@@ -148,18 +149,20 @@ export class ReadOnlyAdapter implements DiagramAdapter {
     // toggle 按钮（初始显示代码 → 选中态蓝色，与 Visimer 工具按钮一致）
     const toggleBtn = document.createElement("button");
     toggleBtn.type = "button";
-    toggleBtn.title = "Toggle the source textarea";
+    toggleBtn.title = t("code.title");
     Object.assign(toggleBtn.style, {
       fontSize: "12px",
-      padding: "4px 10px",
+      padding: "4px 12px",
+      minWidth: "88px",
       border: "1px solid #2b6cb0",
       borderRadius: "6px",
       background: "#2b6cb0",
       color: "#ffffff",
       cursor: "pointer",
       fontFamily: "inherit",
+      whiteSpace: "nowrap",
     });
-    toggleBtn.textContent = "Hide Code";
+    toggleBtn.textContent = t("code.hide");
 
     // 状态指示器
     const statusLabel = document.createElement("span");
@@ -168,7 +171,7 @@ export class ReadOnlyAdapter implements DiagramAdapter {
       color: "#64748b",
       marginLeft: "auto", // 推到工具栏最右
     });
-    statusLabel.textContent = "Rendering...";
+    statusLabel.textContent = t("status.rendering");
 
     toolbar.appendChild(toggleBtn);
     toolbar.appendChild(statusLabel);
@@ -237,11 +240,11 @@ export class ReadOnlyAdapter implements DiagramAdapter {
       textPaneVisible = !textPaneVisible;
       if (textPaneVisible) {
         textPane.style.display = "flex";
-        toggleBtn.textContent = "Hide Code";
+        toggleBtn.textContent = t("code.hide");
         Object.assign(toggleBtn.style, { background: "#2b6cb0", borderColor: "#2b6cb0", color: "#ffffff" });
       } else {
         textPane.style.display = "none";
-        toggleBtn.textContent = "Show Code";
+        toggleBtn.textContent = t("code.show");
         Object.assign(toggleBtn.style, { background: "#ffffff", borderColor: "#cbd5e1", color: "#475569" });
       }
     });
@@ -256,11 +259,11 @@ export class ReadOnlyAdapter implements DiagramAdapter {
     }
     switch (status) {
       case "rendering":
-        this.statusLabel.textContent = "Rendering...";
+        this.statusLabel.textContent = t("status.rendering");
         this.statusLabel.style.color = "#64748b";
         break;
       case "ok":
-        this.statusLabel.textContent = "Syntax valid";
+        this.statusLabel.textContent = t("status.ok");
         this.statusLabel.style.color = "#16a34a";
         break;
       case "error": {
@@ -327,7 +330,7 @@ export class ReadOnlyAdapter implements DiagramAdapter {
     const title = document.createElement("div");
     title.style.fontWeight = "600";
     title.style.marginBottom = "8px";
-    title.textContent = "⚠ Mermaid syntax error";
+    title.textContent = "⚠ " + t("error.syntax");
     const body = document.createElement("div");
     body.style.fontFamily = "'JetBrains Mono', 'SF Mono', Menlo, monospace";
     body.style.fontSize = "12px";
@@ -340,7 +343,7 @@ export class ReadOnlyAdapter implements DiagramAdapter {
     hint.style.marginTop = "12px";
     hint.style.fontSize = "12px";
     hint.style.color = "#64748b";
-    hint.textContent = "Fix the code in the left textarea; it auto-saves when valid";
+    hint.textContent = t("error.fixHint");
     box.appendChild(title);
     box.appendChild(body);
     box.appendChild(hint);

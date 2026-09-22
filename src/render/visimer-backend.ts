@@ -13,6 +13,7 @@
 import mermaid from "mermaid";
 import type { BackendFactory, RenderBackend, RenderBackendOptions } from "./backend";
 import { buildExportDropdown } from "../utils/exporter-ui";
+import { t } from "../utils/i18n";
 import {
   MermaidWysiwygEditor,
   DIAGRAM_TYPES,
@@ -24,23 +25,23 @@ import { MermaidCodeMirror } from "@visimer/codemirror";
 import { EditorView } from "@codemirror/view";
 
 const SHAPES: Array<{ id: ShapeId; label: string }> = [
-  { id: "rect", label: "矩形" },
-  { id: "round", label: "圆角" },
-  { id: "diamond", label: "菱形" },
-  { id: "cylinder", label: "数据库" },
-  { id: "hexagon", label: "六边形" },
-  { id: "circle", label: "圆形" },
+  { id: "rect", label: "shape.rect" },
+  { id: "round", label: "shape.round" },
+  { id: "diamond", label: "shape.diamond" },
+  { id: "cylinder", label: "shape.cylinder" },
+  { id: "hexagon", label: "shape.hexagon" },
+  { id: "circle", label: "shape.circle" },
 ];
 
 const PARTICIPANTS: Array<{ id: ParticipantType; label: string }> = [
-  { id: "actor", label: "Actor" },
-  { id: "participant", label: "Participant" },
-  { id: "boundary", label: "Boundary" },
-  { id: "control", label: "Control" },
-  { id: "entity", label: "Entity" },
-  { id: "database", label: "Database" },
-  { id: "collections", label: "Collections" },
-  { id: "queue", label: "Queue" },
+  { id: "actor", label: "participant.actor" },
+  { id: "participant", label: "participant.participant" },
+  { id: "boundary", label: "participant.boundary" },
+  { id: "control", label: "participant.control" },
+  { id: "entity", label: "participant.entity" },
+  { id: "database", label: "participant.database" },
+  { id: "collections", label: "participant.collections" },
+  { id: "queue", label: "participant.queue" },
 ];
 
 export interface VisimerBackendOptions {
@@ -144,7 +145,7 @@ export class VisimerBackend implements RenderBackend {
       cursor: "pointer", fontFamily: "inherit", marginLeft: "4px",
     });
     const toggleCodeBtnSet = (shown: boolean) => {
-      toggleCodeBtn.textContent = shown ? "Hide Code" : "Show Code";
+      toggleCodeBtn.textContent = shown ? t("code.hide") : t("code.show");
       Object.assign(toggleCodeBtn.style, (
         shown
           ? { background: "#2b6cb0", borderColor: "#2b6cb0", color: "#ffffff" }
@@ -174,7 +175,7 @@ export class VisimerBackend implements RenderBackend {
         this.statusLabel.textContent = "✗ " + view.renderError.replace(/\n/g, " ").slice(0, 50);
         this.statusLabel.style.color = "#dc2626";
       } else {
-        this.statusLabel.textContent = "✓ mermaid parse ok";
+        this.statusLabel.textContent = "✓ " + t("status.ok");
         this.statusLabel.style.color = "#16a34a";
       }
     });
@@ -256,7 +257,7 @@ export class VisimerBackend implements RenderBackend {
       flex: "0 0 auto",
       borderBottom: "1px solid #e2e8f0",
     });
-    codeHeader.textContent = "📝 Mermaid Source";
+    codeHeader.textContent = "📝 " + t("code.title");
 
     const codeMirrorHost = document.createElement("div");
     codeMirrorHost.className = "mw-codemirror-host";
@@ -282,7 +283,7 @@ export class VisimerBackend implements RenderBackend {
       flex: "0 0 auto",
     });
     const statusLabel = document.createElement("span");
-    statusLabel.textContent = "● 初始化...";
+    statusLabel.textContent = "● " + t("status.init");
     statusBar.appendChild(statusLabel);
 
     body.appendChild(canvasSlot);
@@ -339,14 +340,14 @@ export class VisimerBackend implements RenderBackend {
     };
 
     // Select
-    const selectBtn = makeBtn("Select", () => {
+    const selectBtn = makeBtn(t("tool.select"), () => {
       view.setTool("select");
       setActiveBtn(selectBtn);
     });
     toolbar.appendChild(selectBtn);
 
     // Connect
-    const connectBtn = makeBtn("Connect", () => {
+    const connectBtn = makeBtn(t("tool.connect"), () => {
       view.setTool("connect");
       setActiveBtn(connectBtn);
     });
@@ -361,25 +362,6 @@ export class VisimerBackend implements RenderBackend {
     // 类型专属按钮（动态出现）
     const typeToolsHost = document.createElement("span");
     toolbar.appendChild(typeToolsHost);
-
-    // Delete（需要 selection）
-    // 兼容不同 entity id 形态：若选中 id 裸（无前缀）而 deleteEntities 期望 node:/edge: 等前缀，
-    // 自动补前缀，确保删除有反应
-    const DELETE_PREFIXES = [
-      "node:", "edge:", "state:", "class:", "entity:", "participant:",
-      "event:", "trans:", "rel:", "erel:", "slice:", "task:", "item:",
-    ];
-    const deleteBtn = makeBtn("🗑 Delete", () => {
-      const sel = editor.selection;
-      if (sel.length === 0) return;
-      const ids = sel.map((id) => {
-        if (editor.entityExists(id)) return id;
-        const hit = DELETE_PREFIXES.find((p) => editor.entityExists(p + id));
-        return hit ? hit + id : id;
-      });
-      editor.deleteEntities(ids);
-    });
-    toolbar.appendChild(deleteBtn);
 
     // spacer
     const spacer = document.createElement("span");
@@ -398,11 +380,11 @@ export class VisimerBackend implements RenderBackend {
     toolbar.appendChild(buildExportDropdown({ getCode: codeFn, getType: typeFn, statusLabel: this.statusLabel, getSvgElement: svgElFn }));
 
     // Undo
-    const undoBtn = makeBtn("↶ Undo", () => editor.undo());
+    const undoBtn = makeBtn("↶ " + t("edit.undo"), () => editor.undo());
     toolbar.appendChild(undoBtn);
 
     // Redo
-    const redoBtn = makeBtn("↷ Redo", () => editor.redo());
+    const redoBtn = makeBtn("↷ " + t("edit.redo"), () => editor.redo());
     toolbar.appendChild(redoBtn);
 
     // 初始激活 Select
@@ -419,12 +401,12 @@ export class VisimerBackend implements RenderBackend {
         const nodeSelect = document.createElement("select");
         Object.assign(nodeSelect.style, btnStyle, { padding: "3px 6px" });
         const defaultOpt = document.createElement("option");
-        defaultOpt.textContent = "+ Node...";
+        defaultOpt.textContent = t("shape.addNode");
         nodeSelect.appendChild(defaultOpt);
         SHAPES.forEach((s) => {
           const opt = document.createElement("option");
           opt.value = s.id;
-          opt.textContent = s.label;
+          opt.textContent = t(s.label);
           nodeSelect.appendChild(opt);
         });
         nodeSelect.addEventListener("change", () => {
@@ -456,12 +438,12 @@ export class VisimerBackend implements RenderBackend {
         const partSelect = document.createElement("select");
         Object.assign(partSelect.style, btnStyle, { padding: "3px 6px" });
         const defaultOpt = document.createElement("option");
-        defaultOpt.textContent = "+ Participant...";
+        defaultOpt.textContent = t("shape.addParticipant");
         partSelect.appendChild(defaultOpt);
         PARTICIPANTS.forEach((p) => {
           const opt = document.createElement("option");
           opt.value = p.id;
-          opt.textContent = p.label;
+          opt.textContent = t(p.label);
           partSelect.appendChild(opt);
         });
         partSelect.addEventListener("change", () => {
@@ -472,10 +454,10 @@ export class VisimerBackend implements RenderBackend {
         });
         typeToolsHost.appendChild(partSelect);
       } else if (typeId === "class") {
-        const clsBtn = makeBtn("+ Class", () => editor.dispatch({ type: "cl.addClass" }));
+        const clsBtn = makeBtn(t("shape.addClass"), () => editor.dispatch({ type: "cl.addClass" }));
         typeToolsHost.appendChild(clsBtn);
       } else if (typeId === "er") {
-        const entBtn = makeBtn("+ Entity", () => editor.dispatch({ type: "er.addEntity" }));
+        const entBtn = makeBtn(t("shape.addEntity"), () => editor.dispatch({ type: "er.addEntity" }));
         typeToolsHost.appendChild(entBtn);
       }
     };
@@ -485,12 +467,11 @@ export class VisimerBackend implements RenderBackend {
     // 监听类型变化（如果图类型切换了）
     editor.on("change", () => updateTypeTools());
 
-    // Update undo/redo/delete disabled state（disabled 时置灰，保持一致 UI）
+    // Update undo/redo disabled state（disabled 时置灰，保持一致 UI）
     const updateUndoRedo = () => {
       undoBtn.disabled = !editor.canUndo;
       redoBtn.disabled = !editor.canRedo;
-      deleteBtn.disabled = editor.selection.length === 0;
-      for (const b of [undoBtn, redoBtn, deleteBtn]) {
+      for (const b of [undoBtn, redoBtn]) {
         Object.assign(b.style, {
           color: b.disabled ? "#cbd5e1" : "#475569",
           cursor: b.disabled ? "not-allowed" : "pointer",
@@ -499,10 +480,7 @@ export class VisimerBackend implements RenderBackend {
       }
     };
     updateUndoRedo();
-    // 纯选中节点（不改代码）只触发 selectionChange，不触发 change——必须也监听，
-    // 否则 Delete 一直置灰不可用
     editor.on("change", () => updateUndoRedo());
-    editor.on("selectionChange", () => updateUndoRedo());
   }
 
   destroy(): void {

@@ -1,6 +1,6 @@
 {
   "name": "siyuan-mermaid-wysiwyg-editor",
-  "version": "0.3.4",
+  "version": "0.3.5",
   "description": "思源笔记 Mermaid 代码块双向可视化编辑插件（block-icon / 快捷键触发，Dialog 承载画布，围栏剥离与包回写回，原生 Markdown 存储零失真）",
   "main": "dist/index.js",
   "scripts": {
