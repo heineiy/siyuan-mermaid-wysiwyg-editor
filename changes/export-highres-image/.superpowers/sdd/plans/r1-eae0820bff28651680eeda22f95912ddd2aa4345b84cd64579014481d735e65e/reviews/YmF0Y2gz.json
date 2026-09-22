@@ -1,0 +1,10 @@
+{
+  "status": "pass",
+  "base": "28d79267f698f18df68bdc7ac1a333f0b355ee28",
+  "head": "1ed4234afe766b6c27c08bfc03534896f5241470",
+  "report": ".superpowers/sdd/reviews/batch3-integration-build.md",
+  "report_sha256": "sha256:327df6c6f3a9eb20cc3a76358a874d638a904ffbb7a6c2ab03dec2b89e49ae9f",
+  "plan_hash": "sha256:eae0820bff28651680eeda22f95912ddd2aa4345b84cd64579014481d735e65e",
+  "plan_revision": 1,
+  "recorded_at": "2026-09-22T06:28:17.435Z"
+}
