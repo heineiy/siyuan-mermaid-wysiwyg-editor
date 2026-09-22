@@ -2,8 +2,15 @@
  * exporter-ui.ts — 导出下拉按钮组工厂（供 VisimerBackend + ReadOnlyAdapter 共用）
  *
  * 把导出入口的 UI 构建逻辑从两个 adapter 中抽出来，避免重复代码。
- * 纯 DOM API + 动态 import Exporter/mermaid，零新依赖。
+ *
+ * 注意：使用**静态 import** 加载 mermaid 和 Exporter，而非动态 import。
+ * 原因：思源插件产物是 CJS 格式（vite lib.formats=["cjs"]），
+ * 动态 import("mermaid") 在 CJS 插件运行环境中会失败。
+ * 静态 import 由 vite/rollup 在构建时 dedupe 到同一个 mermaid 模块实例。
  */
+
+import mermaid from "mermaid";
+import { Exporter } from "./exporter";
 
 export interface ExportDropdownOptions {
   /** 获取当前 Mermaid 源码 */
@@ -77,12 +84,17 @@ export function buildExportDropdown(opts: ExportDropdownOptions): HTMLElement {
     menu.appendChild(item);
   };
 
+  // mermaid 由顶部静态 import 加载，vite/rollup 会与 VisimerBackend/ReadOnlyAdapter 中的
+  // 同模块静态 import dedupe 到同一个模块实例
+  const mm = mermaid as any;
+  if (!mm?.render) {
+    // 构建时 mermaid 一定存在（打包进 bundle），但兜底检查
+    showError("mermaid 模块缺失（构建异常）");
+  }
+
   const runExport = async (format: "png" | "svg", scale?: 2 | 3) => {
-    const { Exporter } = await import("./exporter.js");
-    const mermaidMod = await import("mermaid").catch(() => null);
-    const mermaid = mermaidMod as any;
-    if (!mermaid?.render) throw new Error("mermaid 未加载");
-    const exp = new Exporter({ getCode, mermaid });
+    if (!mm?.render) throw new Error("mermaid 模块不可用");
+    const exp = new Exporter({ getCode, mermaid: mm });
     let blob: Blob;
     if (format === "svg") {
       blob = await exp.exportSVG();
@@ -95,11 +107,8 @@ export function buildExportDropdown(opts: ExportDropdownOptions): HTMLElement {
   };
 
   const runCopy = async (format: "png" | "svg") => {
-    const { Exporter } = await import("./exporter.js");
-    const mermaidMod = await import("mermaid").catch(() => null);
-    const mermaid = mermaidMod as any;
-    if (!mermaid?.render) throw new Error("mermaid 未加载");
-    const exp = new Exporter({ getCode, mermaid });
+    if (!mm?.render) throw new Error("mermaid 模块不可用");
+    const exp = new Exporter({ getCode, mermaid: mm });
     if (format === "svg") await exp.copySVG();
     else await exp.copyPNG();
   };
