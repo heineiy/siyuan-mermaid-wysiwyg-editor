@@ -12,16 +12,37 @@
  */
 
 export interface ExporterOptions {
-  /** 获取当前 Mermaid 代码（可来自 Visimer editor 或 textarea） */
+  /** 获取当前 Mermaid 源码 */
   getCode: () => string;
-  /** mermaid 实例（带 render 方法） */
-  mermaid: { render: (id: string, code: string) => Promise<{ svg: string }> };
+  /** mermaid 实例（带 render 方法，签名 render(id, text, container?)） */
+  mermaid: {
+    render: (id: string, code: string, container?: HTMLElement) => Promise<{ svg: string }>;
+  };
 }
 
 const EXPORTER_ID_PREFIX = "__exporter_" + Math.random().toString(36).slice(2, 8);
 
 /** 工具：自动生成唯一 id（避免多次 render 冲突） */
 const nextRenderId = () => EXPORTER_ID_PREFIX + "_" + Date.now() + "_" + Math.floor(Math.random() * 1000);
+
+/**
+ * 工具：在 body 上创建一个临时 container，render 完成（无论成功失败）后 remove。
+ *
+ * mermaid v12 render(id, text, container?) — container 不传时会把 SVG
+ * append 到 document.body，**污染思源主窗口 DOM**。必须传临时容器。
+ */
+function withTempContainer<T>(fn: (container: HTMLElement) => Promise<T>): Promise<T> {
+  const container = document.createElement("div");
+  container.style.position = "fixed";
+  container.style.left = "-9999px";
+  container.style.top = "0";
+  document.body.appendChild(container);
+  try {
+    return fn(container);
+  } finally {
+    if (container.parentNode) container.parentNode.removeChild(container);
+  }
+}
 
 export class Exporter {
   private readonly opts: ExporterOptions;
@@ -38,8 +59,12 @@ export class Exporter {
    * @returns Blob type=image/svg+xml
    */
   async exportSVG(): Promise<Blob> {
-    const { svg } = await this.opts.mermaid.render(nextRenderId(), this.opts.getCode());
-    return new Blob([svg], { type: "image/svg+xml" });
+    const code = this.opts.getCode();
+    if (!code.trim()) throw new Error("Mermaid 代码为空");
+    return withTempContainer(async (container) => {
+      const { svg } = await this.opts.mermaid.render(nextRenderId(), code, container);
+      return new Blob([svg], { type: "image/svg+xml" });
+    });
   }
 
   /**
@@ -49,8 +74,12 @@ export class Exporter {
    * @returns Blob type=image/png
    */
   async exportPNG(scale: 1 | 2 | 3 = 2): Promise<Blob> {
-    const { svg } = await this.opts.mermaid.render(nextRenderId(), this.opts.getCode());
-    return Exporter.svgToPngBlob(svg, scale);
+    const code = this.opts.getCode();
+    if (!code.trim()) throw new Error("Mermaid 代码为空");
+    return withTempContainer(async (container) => {
+      const { svg } = await this.opts.mermaid.render(nextRenderId(), code, container);
+      return Exporter.svgToPngBlob(svg, scale);
+    });
   }
 
   // ---------- 下载 + 复制 ----------

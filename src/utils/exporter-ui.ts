@@ -34,24 +34,38 @@ export interface ExportDropdownOptions {
 export function buildExportDropdown(opts: ExportDropdownOptions): HTMLElement {
   const { getCode, getType, statusLabel } = opts;
 
+  // 与 Visimer makeBtn 样式对齐
+  const btnBase: Record<string, string> = {
+    fontSize: "12px",
+    padding: "4px 10px",
+    border: "1px solid #cbd5e1",
+    borderRadius: "6px",
+    background: "#ffffff",
+    color: "#475569",
+    cursor: "pointer",
+    fontFamily: "inherit",
+  };
+
   const host = document.createElement("div");
   Object.assign(host.style, { position: "relative", display: "inline-block" });
 
   const btn = document.createElement("button");
   btn.type = "button";
-  btn.textContent = "📤 导出 ▾";
-  Object.assign(btn.style, {
-    padding: "4px 10px", fontSize: "13px", border: "1px solid #e2e8f0",
-    borderRadius: "4px", background: "#fff", cursor: "pointer",
-    color: "#475569",
-  });
+  btn.textContent = "导出 ▾";
+  Object.assign(btn.style, btnBase);
+  // hover 态：浅灰底
+  btn.addEventListener("mouseenter", () => (btn.style.background = "#f1f5f9"));
+  btn.addEventListener("mouseleave", () => (btn.style.background = "#ffffff"));
+  btn.addEventListener("mousedown", () => (btn.style.background = "#e2e8f0"));
+  btn.addEventListener("mouseup", () => (btn.style.background = "#f1f5f9"));
 
   const menu = document.createElement("div");
   Object.assign(menu.style, {
     position: "absolute", top: "100%", right: "0", marginTop: "4px",
-    background: "#fff", border: "1px solid #e2e8f0", borderRadius: "6px",
-    boxShadow: "0 4px 12px rgba(0,0,0,0.1)", minWidth: "160px",
+    background: "#ffffff", border: "1px solid #cbd5e1", borderRadius: "6px",
+    boxShadow: "0 6px 20px rgba(0,0,0,0.12)", minWidth: "180px",
     zIndex: "1000", display: "none", flexDirection: "column",
+    padding: "4px 0", overflow: "hidden",
   });
 
   const showError = (msg: string) => {
@@ -61,19 +75,27 @@ export function buildExportDropdown(opts: ExportDropdownOptions): HTMLElement {
     statusLabel.textContent = `导出失败：${msg}`;
   };
 
-  const mkItem = (label: string, action: () => Promise<void>) => {
+  const mkItem = (label: string, action: () => Promise<void>, danger = false) => {
     const item = document.createElement("button");
     item.type = "button";
     item.textContent = label;
     Object.assign(item.style, {
-      padding: "8px 14px", border: "none", background: "transparent",
-      cursor: "pointer", fontSize: "13px", textAlign: "left",
-      color: "#334155", width: "100%",
+      padding: "6px 14px", border: "none", background: "transparent",
+      cursor: "pointer", fontSize: "12px", textAlign: "left",
+      color: danger ? "#dc2626" : "#334155", width: "100%",
+      fontFamily: "inherit", lineHeight: "1.5",
     });
-    item.addEventListener("mouseenter", () => (item.style.background = "#f1f5f9"));
-    item.addEventListener("mouseleave", () => (item.style.background = "transparent"));
+    item.addEventListener("mouseenter", () => {
+      item.style.background = "#f1f5f9";
+      item.style.color = danger ? "#dc2626" : "#1e293b";
+    });
+    item.addEventListener("mouseleave", () => {
+      item.style.background = "transparent";
+      item.style.color = danger ? "#dc2626" : "#334155";
+    });
     item.addEventListener("click", async () => {
       menu.style.display = "none";
+      btn.style.background = "#ffffff";
       try {
         await action();
       } catch (err) {
@@ -84,11 +106,16 @@ export function buildExportDropdown(opts: ExportDropdownOptions): HTMLElement {
     menu.appendChild(item);
   };
 
+  // 分隔线
+  const divider = document.createElement("div");
+  Object.assign(divider.style, {
+    height: "1px", background: "#e2e8f0", margin: "4px 0",
+  });
+
   // mermaid 由顶部静态 import 加载，vite/rollup 会与 VisimerBackend/ReadOnlyAdapter 中的
   // 同模块静态 import dedupe 到同一个模块实例
   const mm = mermaid as any;
   if (!mm?.render) {
-    // 构建时 mermaid 一定存在（打包进 bundle），但兜底检查
     showError("mermaid 模块缺失（构建异常）");
   }
 
@@ -113,18 +140,25 @@ export function buildExportDropdown(opts: ExportDropdownOptions): HTMLElement {
     else await exp.copyPNG();
   };
 
-  mkItem("📥 下载 PNG", () => runExport("png", 2));
-  mkItem("📥 下载 PNG (3x)", () => runExport("png", 3));
-  mkItem("📥 下载 SVG", () => runExport("svg"));
-  mkItem("📋 复制 PNG 到剪贴板", () => runCopy("png"));
-  mkItem("📋 复制 SVG 到剪贴板", () => runCopy("svg"));
+  // 下载组
+  mkItem("下载 PNG (Retina 2x)", () => runExport("png", 2));
+  mkItem("下载 PNG (高清 3x)", () => runExport("png", 3));
+  mkItem("下载 SVG 矢量", () => runExport("svg"));
+  // 分隔
+  menu.appendChild(divider);
+  // 剪贴板组
+  mkItem("复制 PNG 到剪贴板", () => runCopy("png"));
+  mkItem("复制 SVG 到剪贴板", () => runCopy("svg"));
 
   btn.addEventListener("click", (e) => {
     e.stopPropagation();
     menu.style.display = menu.style.display === "none" ? "flex" : "none";
   });
   const closeOnOutside = (e: MouseEvent) => {
-    if (!host.contains(e.target as Node)) menu.style.display = "none";
+    if (!host.contains(e.target as Node)) {
+      menu.style.display = "none";
+      btn.style.background = "#ffffff";
+    }
   };
   document.addEventListener("click", closeOnOutside);
 

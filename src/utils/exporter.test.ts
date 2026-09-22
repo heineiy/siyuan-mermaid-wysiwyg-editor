@@ -37,10 +37,10 @@ describe("Exporter", () => {
       expect(await blob.text()).toContain("<svg");
     });
 
-    it("调用 mermaid.render 一次", async () => {
+    it("调用 mermaid.render 一次，传临时 container", async () => {
       await exporter.exportSVG();
       expect(mockRender).toHaveBeenCalledTimes(1);
-      expect(mockRender).toHaveBeenCalledWith(expect.any(String), SAMPLE_CODE);
+      expect(mockRender).toHaveBeenCalledWith(expect.any(String), SAMPLE_CODE, expect.any(HTMLElement));
     });
   });
 
