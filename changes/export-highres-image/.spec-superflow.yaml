@@ -15,9 +15,9 @@ execution_mode: sdd
 execution_plan_hash: sha256:eae0820bff28651680eeda22f95912ddd2aa4345b84cd64579014481d735e65e
 execution_plan_revision: 1
 batches_completed: 0
-test_result: null
-spec_merged: false
-spec_publication_receipt: null
+test_result: pass: 178 tests passed (2 skipped, 0 failed); npm run build success; CHANGELOG v0.3.0; batch1/batch2/batch3 reviews all pass
+spec_merged: true
+spec_publication_receipt: eyJ2ZXJzaW9uIjoxLCJzb3VyY2VfaGFzaCI6InNoYTI1Njo3NjJlNTUyM2U1YTBkNmJlZjRlM2JmNWRkNTkxMmM5OWU0Y2NlODIwNjY5OGMyYjgxMjU2NDY4MTQ5NGVmYzllIiwiYmFzZWxpbmVfYmVmb3JlX2hhc2giOiJzaGEyNTY6MjdkMGVlMWYxMTg1YmY1NTUyZjA5N2M5Mjk3OTI1N2E4N2VjZjI5OTRiYTU2YTEzY2QxM2JkOWVkNjk1YTg5ZCIsImJhc2VsaW5lX2FmdGVyX2hhc2giOiJzaGEyNTY6Y2Y4YTRmMGM5Yzg3NjIyZjUxYmQ0NDEzYjZiMmNjZDgxMmM4MWVhMjk4OGZjMzRkNjIxY2M0N2NjYTMzMmJlZSIsImNhcGFiaWxpdGllcyI6WyJleHBvcnQtaGlnaHJlcyJdfQ
 
 # === Metadata ===
 change_name: export-highres-image
