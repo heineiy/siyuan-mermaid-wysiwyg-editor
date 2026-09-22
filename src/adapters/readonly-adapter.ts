@@ -32,6 +32,7 @@
 
 import type { AdapterOptions, DiagramAdapter } from "./registry";
 import mermaid from "mermaid";
+import { buildExportDropdown } from "../utils/exporter-ui";
 
 /** 渲染结果：只读 SVG 字符串。 */
 export interface ReadonlyRenderResult {
@@ -383,6 +384,12 @@ export class ReadOnlyAdapter implements DiagramAdapter {
     this.textPane = layout.textPane;
     this.statusLabel = layout.statusLabel;
     this.toolbar = layout.toolbar;
+
+    // 导出 dropdown（共用 exporter-ui 工厂函数）
+    this.toolbar.appendChild(buildExportDropdown({
+      getCode: () => this.textarea?.value ?? "",
+      statusLabel: this.statusLabel,
+    }));
 
     // textarea 初始灌 code
     this.applying = true;

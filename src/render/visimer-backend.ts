@@ -12,6 +12,7 @@
  */
 import mermaid from "mermaid";
 import type { BackendFactory, RenderBackend, RenderBackendOptions } from "./backend";
+import { buildExportDropdown } from "../utils/exporter-ui";
 import {
   MermaidWysiwygEditor,
   DIAGRAM_TYPES,
@@ -385,6 +386,11 @@ export class VisimerBackend implements RenderBackend {
     const spacer = document.createElement("span");
     Object.assign(spacer.style, { flex: "1 1 auto" });
     toolbar.appendChild(spacer);
+
+    // --- 导出 dropdown（共用 exporter-ui 工厂函数） ---
+    const codeFn = () => (editor as any).getCode?.() ?? "";
+    const typeFn = () => (editor as any).result?.typeInfo?.id ?? "diagram";
+    toolbar.appendChild(buildExportDropdown({ getCode: codeFn, getType: typeFn, statusLabel: this.statusLabel }));
 
     // Undo
     const undoBtn = makeBtn("↶ Undo", () => editor.undo());
