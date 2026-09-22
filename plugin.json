@@ -2,7 +2,7 @@
   "name": "siyuan-mermaid-wysiwyg-editor",
   "author": "heiney",
   "url": "https://github.com/heineiy/siyuan-mermaid-wysiwyg-editor",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "minAppVersion": "3.8.0",
   "kernels": [
     "all"

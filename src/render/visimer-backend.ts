@@ -483,7 +483,10 @@ export class VisimerBackend implements RenderBackend {
       }
     };
     updateUndoRedo();
+    // 纯选中节点（不改代码）只触发 selectionChange，不触发 change——必须也监听，
+    // 否则 Delete 一直置灰不可用
     editor.on("change", () => updateUndoRedo());
+    editor.on("selectionChange", () => updateUndoRedo());
   }
 
   destroy(): void {
