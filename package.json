@@ -34,6 +34,7 @@
     "happy-dom": "^20.14.5",
     "typescript": "^6.0.3",
     "vite": "^7.0.0",
+    "vite-plugin-zip-pack": "^1.2.4",
     "vitest": "^5.0.1"
   }
 }

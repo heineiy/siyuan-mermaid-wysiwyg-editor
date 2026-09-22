@@ -1,25 +1,41 @@
 import { defineConfig } from "vitest/config";
 import type { Plugin } from "vite";
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { copyFileSync, mkdirSync } from "node:fs";
 import { resolve } from "node:path";
+import zipPack from "vite-plugin-zip-pack";
 
 /**
- * 将 plugin.json（思源插件清单）复制到构建产物根目录。
- * SiYuan 插件目录要求同时包含 plugin.json 与入口 JS（index.js）。
- * GitHub Release 中的 package.zip 解压后根目录须有这两个文件。
+ * 将思源插件运行所需的静态资源复制到构建产物目录。
+ * 参考 task-note-management：dist/ 目录本身就是 package.zip 的内容根目录，
+ * 即 zip 解压后根目录直接是 index.js / plugin.json / icon.png 等，不能多一层 dist/。
  */
-const copyPluginJson = (): Plugin => {
+const copyStaticAssets = (): Plugin => {
   let outDir = "dist";
+  // 思源插件目录必须包含的前端资源
+  const assets = [
+    "plugin.json",
+    "icon.png",
+    "preview.png",
+    "README.md",
+    "README.en.md",
+    "LICENSE",
+  ];
   return {
-    name: "copy-plugin-json",
+    name: "copy-siyuan-assets",
     apply: "build",
     configResolved(config) {
       outDir = config.build.outDir;
     },
     closeBundle() {
-      const manifest = readFileSync(resolve("plugin.json"), "utf-8");
       mkdirSync(outDir, { recursive: true });
-      writeFileSync(resolve(outDir, "plugin.json"), manifest);
+      for (const file of assets) {
+        const src = resolve(file);
+        try {
+          copyFileSync(src, resolve(outDir, file));
+        } catch {
+          // 允许某些文件缺失（如 README.en.md），静默跳过
+        }
+      }
     },
   };
 };
@@ -54,7 +70,15 @@ export default defineConfig({
       },
     },
   },
-  plugins: [copyPluginJson()],
+  plugins: [
+    copyStaticAssets(),
+    // 将 dist/ 整体打为根目录 package.zip，确保 zip 内无 dist/ 前缀
+    zipPack({
+      inDir: "./dist",
+      outDir: "./",
+      outFileName: "package.zip",
+    }),
+  ],
   test: {
     environment: "node",
     include: ["src/**/*.test.ts"],
