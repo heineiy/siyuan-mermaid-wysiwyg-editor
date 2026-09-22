@@ -52,6 +52,28 @@ describe("Exporter", () => {
     it.skip("scale=3 显式指定 → 也能导出（真实浏览器环境验证）", async () => {});
   });
 
+  // --- 解析 PNG SVG 输入（纯 DOM 解析，可用单测；根因回归：Cannot read properties of null 'getAttribute') ---
+  describe("parseSvg", () => {
+    it("合法 svg → 返回根元素，可读 width/height", () => {
+      const root = Exporter.parseSvg(`<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300"></svg>`);
+      expect(root.tagName.toLowerCase()).toBe("svg");
+      expect(root.getAttribute("width")).toBe("400");
+    });
+
+    it("空字符串 → 抛清晰错误（防原本的裸 getAttribute TypeError）", () => {
+      expect(() => Exporter.parseSvg("")).toThrow("未返回有效的 SVG");
+    });
+
+    it("空白字符串 → 抛清晰错误", () => {
+      expect(() => Exporter.parseSvg("   \n  ")).toThrow("未返回有效的 SVG");
+    });
+
+    it("非法 XML / 非 svg 根（如 <parsererror>）→ 抛清晰错误", () => {
+      // DOMParser 对非法 XML 会产出 <parsererror> 根，或对纯文本产出非 svg 根
+      expect(() => Exporter.parseSvg("not xml at all")).toThrow("未返回有效的 SVG");
+    });
+  });
+
   // --- REQ-EXPORT-003: 下载 ---
   describe("downloadBlob", () => {
     it("生成符合规范的文件名", () => {

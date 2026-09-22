@@ -326,7 +326,8 @@ export class VisimerBackend implements RenderBackend {
 
     const setActiveBtn = (active: HTMLButtonElement) => {
       for (const child of toolbar.children) {
-        if (child instanceof HTMLButtonElement) {
+        // 跳过 disabled 按钮（Delete/Undo/Redo），保留其灰显态
+        if (child instanceof HTMLButtonElement && !child.disabled) {
           Object.assign(child.style, btnStyle);
         }
       }
@@ -468,11 +469,18 @@ export class VisimerBackend implements RenderBackend {
     // 监听类型变化（如果图类型切换了）
     editor.on("change", () => updateTypeTools());
 
-    // Update undo/redo disabled state
+    // Update undo/redo/delete disabled state（disabled 时置灰，保持一致 UI）
     const updateUndoRedo = () => {
       undoBtn.disabled = !editor.canUndo;
       redoBtn.disabled = !editor.canRedo;
       deleteBtn.disabled = editor.selection.length === 0;
+      for (const b of [undoBtn, redoBtn, deleteBtn]) {
+        Object.assign(b.style, {
+          color: b.disabled ? "#cbd5e1" : "#475569",
+          cursor: b.disabled ? "not-allowed" : "pointer",
+          borderColor: b.disabled ? "#e2e8f0" : "#cbd5e1",
+        });
+      }
     };
     updateUndoRedo();
     editor.on("change", () => updateUndoRedo());

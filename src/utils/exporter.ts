@@ -159,16 +159,33 @@ export class Exporter {
   // ---------- 私有静态 ----------
 
   /**
+   * 解析 mermaid.render 输出的 svg 字符串，返回根元素。
+   *
+   * mermaid 可能返回空串 / 非法 XML（如渲染失败时的 <parsererror> 或纯文本），
+   * 此时 DOMParser.documentElement 为 null 或非 svg 根。直接访问会抛裸
+   * `Cannot read properties of null (reading 'getAttribute')`，难以定位。
+   * 这里统一校验并抛清晰错误。
+   *
+   * @throws 解析失败 / 根非 svg 时抛出 `Error`
+   */
+  static parseSvg(svg: string): Element {
+    const doc = new DOMParser().parseFromString(svg, "image/svg+xml");
+    const root = doc.documentElement;
+    if (!root || root.tagName.toLowerCase() !== "svg") {
+      throw new Error("Mermaid 未返回有效的 SVG（渲染可能失败），无法导出");
+    }
+    return root;
+  }
+
+  /**
    * SVG 字符串 → PNG Blob（Canvas 栅格化）。
    *
    * @param svg mermaid.render 返回的 svgString
    * @param scale DPI 倍率（1/2/3）
    */
   static async svgToPngBlob(svg: string, scale: 1 | 2 | 3): Promise<Blob> {
-    // 1. 解析 SVG 拿 width/height
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(svg, "image/svg+xml");
-    const root = doc.documentElement;
+    // 1. 解析 SVG 拿 width/height（解析失败抛清晰错误，而非裸 TypeError）
+    const root = Exporter.parseSvg(svg);
 
     // 确保有 xmlns（缺了 Image 加载会失败）
     if (!root.getAttribute("xmlns")) root.setAttribute("xmlns", "http://www.w3.org/2000/svg");
