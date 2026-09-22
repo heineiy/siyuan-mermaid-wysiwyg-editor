@@ -3,6 +3,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { EventBus } from "siyuan";
 import { isMermaidCodeBlock, registerBlockIconTrigger } from "./trigger";
 
+// 菜单文案走 i18n：断言中文，需固定界面语言为 zh-CN
+document.documentElement.setAttribute("lang", "zh-CN");
+
 /**
  * T9：block-icon 触发入口（REQ-TRIGGER-001 场景 1/2 / D §5.1）。
  *

@@ -7,6 +7,7 @@ import { initEditorSession, type EditorSession } from "./controller/sync";
 import { openEditorDialog } from "./controller/dialog";
 import { registerBlockIconTrigger } from "./controller/trigger";
 import { stripKramdownIal } from "./utils/fence";
+import { t } from "./utils/i18n";
 
 /**
  * 思源内核 API 最小封装（fetchSyncPost 由 siyuan 包运行时导出，siyuan.d.ts:401；
@@ -80,7 +81,7 @@ export default class MermaidWysiwygEditorPlugin extends Plugin {
     // ⌥ = Alt, ⇧ = Shift, ⌘ = Ctrl(macOS 上显示为 Command)
     this.addCommand({
       langKey: "open-mermaid-wysiwyg",
-      langText: "Mermaid 可视化编辑",
+      langText: t("command.edit"),
       hotkey: "⌥⇧M", // Shift+Alt+M
       editorCallback: (protyle) => {
         // 思源会在快捷键触发时传当前编辑器的 selection 信息，
@@ -150,7 +151,7 @@ export default class MermaidWysiwygEditorPlugin extends Plugin {
     let dialogClosed = false;
 
     const handle = openEditorDialog({
-      title: "Mermaid 可视化编辑",
+      title: t("command.edit"),
       width: "90%",
       height: "90%",
       onDestroy: () => {

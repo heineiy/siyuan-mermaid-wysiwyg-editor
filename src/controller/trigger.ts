@@ -18,6 +18,7 @@
  * - 返回卸载函数：移除 click-blockicon 监听，幂等。
  */
 import type { IEventBusMap, IMenu, Plugin } from "siyuan";
+import { t } from "../utils/i18n";
 
 /** registerBlockIconTrigger 选项。 */
 export interface BlockIconTriggerOptions {
@@ -66,7 +67,7 @@ export function registerBlockIconTrigger(options: BlockIconTriggerOptions): () =
     const blockId = block.dataset.nodeId ?? "";
     const menuItem: IMenu = {
       icon: "iconGraph",
-      label: "可视化编辑",
+      label: t("menu.edit"),
       click: () => onOpenMermaidEditor(blockId),
     };
     // 派发器已注入 detail.menu（subMenu）；插件菜单项将出现在块菜单的「插件」子菜单中。

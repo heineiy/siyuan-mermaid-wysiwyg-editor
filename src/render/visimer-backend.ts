@@ -315,6 +315,8 @@ export class VisimerBackend implements RenderBackend {
       cursor: "pointer",
       fontFamily: "inherit",
     };
+    // 连线锁定态：默认连完一条自动回 Select；锁定后连完不跳，可连续连线
+    let connectLocked = false;
 
     const makeBtn = (text: string, onClick: () => void): HTMLButtonElement => {
       const btn = document.createElement("button");
@@ -341,16 +343,30 @@ export class VisimerBackend implements RenderBackend {
 
     // Select
     const selectBtn = makeBtn(t("tool.select"), () => {
+      connectLocked = false;
       view.setTool("select");
+      updateConnectBtnStyle();
       setActiveBtn(selectBtn);
     });
     toolbar.appendChild(selectBtn);
 
-    // Connect
+    // Connect：单击进入连线；再点切换「锁定连续连线」。
+    // 默认连完一条(触发 change)自动回 Select；锁定态连完不跳，可连多条，直到手动点 Select。
     const connectBtn = makeBtn(t("tool.connect"), () => {
-      view.setTool("connect");
+      if (view.tool !== "connect") {
+        connectLocked = false;
+        view.setTool("connect");
+      } else {
+        connectLocked = !connectLocked;
+      }
+      updateConnectBtnStyle();
       setActiveBtn(connectBtn);
     });
+    const updateConnectBtnStyle = () => {
+      connectBtn.title = connectLocked ? t("tool.connectLockedHint") : t("tool.connectHint");
+      connectBtn.style.outline = connectLocked ? "2px solid #2b6cb0" : "";
+      connectBtn.style.outlineOffset = connectLocked ? "1px" : "";
+    };
     toolbar.appendChild(connectBtn);
 
     // 分隔
@@ -480,6 +496,14 @@ export class VisimerBackend implements RenderBackend {
       }
     };
     updateUndoRedo();
+    // 连线完成（dispatch connect 会触发 change）：非锁定时自动回 Select；锁定时保持连线
+    editor.on("change", () => {
+      if (view.tool === "connect" && !connectLocked) {
+        view.setTool("select");
+        setActiveBtn(selectBtn);
+        updateConnectBtnStyle();
+      }
+    });
     editor.on("change", () => updateUndoRedo());
   }
 

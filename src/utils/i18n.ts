@@ -10,9 +10,14 @@ const en: Dict = {
   // 工具
   "tool.select": "Select",
   "tool.connect": "Connect",
+  "tool.connectHint": "Click again to lock & connect multiple",
+  "tool.connectLockedHint": "Locked: connect multiple (click to unlock)",
   // 编辑
   "edit.undo": "Undo",
   "edit.redo": "Redo",
+  // 菜单/命令
+  "menu.edit": "Visual Edit",
+  "command.edit": "Mermaid Visual Edit",
   // 代码面板
   "code.hide": "Hide Code",
   "code.show": "Show Code",
@@ -56,8 +61,12 @@ const en: Dict = {
 const zh: Dict = {
   "tool.select": "选择",
   "tool.connect": "连线",
+  "tool.connectHint": "再次点击锁定，可连续连线",
+  "tool.connectLockedHint": "已锁定连续连线（点击解锁）",
   "edit.undo": "撤销",
   "edit.redo": "重做",
+  "menu.edit": "可视化编辑",
+  "command.edit": "Mermaid 可视化编辑",
   "code.hide": "隐藏代码",
   "code.show": "显示代码",
   "code.title": "Mermaid 源码",
