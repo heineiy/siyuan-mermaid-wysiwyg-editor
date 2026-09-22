@@ -54,6 +54,37 @@ export class Exporter {
   // ---------- 核心导出 ----------
 
   /**
+   * 渲染 SVG 字符串，遇 mermaid 懒加载时序错误自动重试。
+   *
+   * mermaid 12 按需加载各图类型的渲染器（flowchart/sequence/... 子 chunk）。
+   * 首次或高并发渲染时，SVG 可能未完全挂载就执行 insertLookDefs 等步骤，
+   * 抛 `Cannot read properties of null (reading 'getAttribute')` 或
+   * `svg element not in render tree`。这些是**瞬态**错误——渲染器注册完成后
+   * 重试通常成功。这里最多重试 3 次，其余错误直接上抛。
+   */
+  private async renderWithRetry(code: string, container: HTMLElement): Promise<string> {
+    let lastErr: unknown;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        const { svg } = await this.opts.mermaid.render(nextRenderId(), code, container);
+        if (!svg.trim()) throw new Error("Mermaid render returned empty SVG");
+        return svg;
+      } catch (err) {
+        lastErr = err;
+        const msg = err instanceof Error ? err.message : String(err);
+        const transient = /getAttribute|not in render tree|undefined\n|UnknownDiagram|no diagram type/i.test(msg);
+        if (transient && attempt < 2) {
+          // 等渲染器子模块加载完成再试
+          await new Promise((r) => setTimeout(r, 120));
+          continue;
+        }
+        throw lastErr;
+      }
+    }
+    throw lastErr;
+  }
+
+  /**
    * 导出 SVG 原始矢量。
    *
    * @returns Blob type=image/svg+xml
@@ -62,7 +93,7 @@ export class Exporter {
     const code = this.opts.getCode();
     if (!code.trim()) throw new Error("Mermaid code is empty");
     return withTempContainer(async (container) => {
-      const { svg } = await this.opts.mermaid.render(nextRenderId(), code, container);
+      const svg = await this.renderWithRetry(code, container);
       return new Blob([svg], { type: "image/svg+xml" });
     });
   }
@@ -77,7 +108,7 @@ export class Exporter {
     const code = this.opts.getCode();
     if (!code.trim()) throw new Error("Mermaid code is empty");
     return withTempContainer(async (container) => {
-      const { svg } = await this.opts.mermaid.render(nextRenderId(), code, container);
+      const svg = await this.renderWithRetry(code, container);
       return Exporter.svgToPngBlob(svg, scale);
     });
   }

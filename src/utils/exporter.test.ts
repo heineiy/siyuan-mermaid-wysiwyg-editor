@@ -99,14 +99,14 @@ describe("Exporter", () => {
     });
   });
 
-  // --- REQ-EXPORT-005: mermaid 渲染失败 / 空代码防护 ---
+  // --- REQ-EXPORT-005: mermaid 渲染失败 / 空代码防护 / 懒加载重试 ---
   describe("错误处理", () => {
     it("mermaid.render 抛错 → 上抛不吞", async () => {
       mockRender.mockRejectedValue(new Error("parse failed"));
       await expect(exporter.exportSVG()).rejects.toThrow("parse failed");
     });
 
-    it("空代码 → 抛 \`Mermaid code is empty\`，不调 mermaid.render（防 'No diagram type detected'）", async () => {
+    it("空代码 → 抛 \`Mermaid code is empty\`，不调 mermaid.render", async () => {
       const empty = new Exporter({ getCode: () => "", mermaid: mockMermaid as any });
       await expect(empty.exportSVG()).rejects.toThrow("Mermaid code is empty");
       await expect(empty.exportPNG()).rejects.toThrow("Mermaid code is empty");
@@ -116,6 +116,21 @@ describe("Exporter", () => {
     it("空白字符代码视为空 → 抛错", async () => {
       const blank = new Exporter({ getCode: () => "  \n\t ", mermaid: mockMermaid as any });
       await expect(blank.exportSVG()).rejects.toThrow("Mermaid code is empty");
+    });
+
+    it("懒加载时序错误(getAttribute null) → 自动重试并成功（renderWithRetry）", async () => {
+      mockRender
+        .mockRejectedValueOnce(new TypeError("Cannot read properties of null (reading 'getAttribute')"))
+        .mockResolvedValueOnce({ svg: SAMPLE_SVG });
+      await expect(exporter.exportSVG()).resolves.toBeInstanceOf(Blob);
+      expect(mockRender).toHaveBeenCalledTimes(2);
+    });
+
+    it("重试耗尽仍失败（非瞬时错误）→ 上抛原错误", async () => {
+      mockRender.mockRejectedValue(new Error("the real failure"));
+      await expect(exporter.exportSVG()).rejects.toThrow("the real failure");
+      // 非瞬时错误不重试，只调 1 次
+      expect(mockRender).toHaveBeenCalledTimes(1);
     });
   });
 });
