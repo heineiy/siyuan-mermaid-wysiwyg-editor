@@ -100,15 +100,12 @@ export class Exporter {
    * @returns Blob type=image/png
    */
   async exportPNG(scale: 1 | 2 | 3 = 2): Promise<Blob> {
-    // 优先：取宿主已渲染的 SVG 节点 → 高分辨率画布转 PNG（参考 copyAsImage）
-    const svgEl = this.opts.getSvgElement?.() ?? null;
-    if (svgEl) {
-      return Exporter.svgElementToPngBlob(svgEl, scale);
-    }
-    // 兜底：重新 mermaid.render
+    // 用**重新 render 的原始 SVG** 转 PNG（不取宿主画布 svg）：确保 viewBox 是 mermaid 精确
+    // 尺寸，避免 Visimer 画布 panZoom 包装导致 viewBox 失真 → 导出尺寸错、模糊。
     Exporter.assertCode(this.opts.getCode());
-    const svg = await this.renderWithRetry(this.opts.getCode());
-    return Exporter.svgToPngBlob(svg, scale);
+    const svgStr = await this.renderWithRetry(this.opts.getCode());
+    const root = Exporter.parseSvg(svgStr);
+    return Exporter.svgElementToPngBlob(root as unknown as SVGSVGElement, scale);
   }
 
   // ---------- 下载 + 复制 ----------
@@ -227,9 +224,12 @@ export class Exporter {
    */
   static svgElementToPngBlob(svgEl: SVGSVGElement, scale: 1 | 2 | 3 = 2): Promise<Blob> {
     const clone = svgEl.cloneNode(true) as SVGSVGElement;
+    // 尺寸优先取 viewBox（mermaid 精确图形边界）；其次 width/height 属性；最后默认 800x600
     const vb = svgEl.viewBox.baseVal;
-    const w = vb && vb.width ? vb.width : svgEl.clientWidth || 800;
-    const h = vb && vb.height ? vb.height : svgEl.clientHeight || 600;
+    const attrW = parseFloat(svgEl.getAttribute("width") || "");
+    const attrH = parseFloat(svgEl.getAttribute("height") || "");
+    const w = vb && vb.width ? vb.width : attrW || svgEl.clientWidth || 800;
+    const h = vb && vb.height ? vb.height : attrH || svgEl.clientHeight || 600;
     const aspect = h > 0 ? w / h : 1;
     const targetW = 1920;
     const targetH = Math.round(targetW / aspect);

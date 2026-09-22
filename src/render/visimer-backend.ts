@@ -363,10 +363,21 @@ export class VisimerBackend implements RenderBackend {
     toolbar.appendChild(typeToolsHost);
 
     // Delete（需要 selection）
+    // 兼容不同 entity id 形态：若选中 id 裸（无前缀）而 deleteEntities 期望 node:/edge: 等前缀，
+    // 自动补前缀，确保删除有反应
+    const DELETE_PREFIXES = [
+      "node:", "edge:", "state:", "class:", "entity:", "participant:",
+      "event:", "trans:", "rel:", "erel:", "slice:", "task:", "item:",
+    ];
     const deleteBtn = makeBtn("🗑 Delete", () => {
-      if (editor.selection.length > 0) {
-        editor.deleteEntities(editor.selection);
-      }
+      const sel = editor.selection;
+      if (sel.length === 0) return;
+      const ids = sel.map((id) => {
+        if (editor.entityExists(id)) return id;
+        const hit = DELETE_PREFIXES.find((p) => editor.entityExists(p + id));
+        return hit ? hit + id : id;
+      });
+      editor.deleteEntities(ids);
     });
     toolbar.appendChild(deleteBtn);
 

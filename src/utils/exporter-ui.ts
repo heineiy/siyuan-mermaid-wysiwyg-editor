@@ -153,9 +153,8 @@ export function buildExportDropdown(opts: ExportDropdownOptions): HTMLElement {
   mkItem("Download SVG", () => runExport("svg"));
   // Divider
   menu.appendChild(divider);
-  // Clipboard group
-  mkItem("Copy PNG to clipboard", () => runCopy("png"));
-  mkItem("Copy SVG to clipboard", () => runCopy("svg"));
+  // Clipboard group：复制统一为 PNG 图片（svg+xml 在多数应用粘贴不是图片，copyAsImage 也只复制 PNG）
+  mkItem("Copy as PNG image", () => runCopy("png"));
 
   btn.addEventListener("click", (e) => {
     e.stopPropagation();
