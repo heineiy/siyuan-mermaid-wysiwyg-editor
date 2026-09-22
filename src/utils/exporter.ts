@@ -2,22 +2,26 @@
  * exporter.ts — Mermaid 高清图片导出模块
  *
  * 纯浏览器 API，零新依赖。支持：
- *   - SVG 原始矢量导出（mermaid.render 的 svgString）
+ *   - SVG 原始矢量导出（优先取已渲染 SVG 节点；无则 mermaid.render 兜底）
  *   - PNG 高清栅格化（SVG → Image → Canvas → toBlob, scale 2x/3x）
  *   - 文件下载（downloadBlob: createObjectURL + a[download]）
  *   - 剪贴板复制（Clipboard API + execCommand 降级）
  *
- * 设计决策：每次导出走独立 mermaid.render（不依赖 Visimer canvasView DOM）。
- * 详见 change docs/export-highres/design.md Decision 1。
+ * 设计决策（参考开源项目 syplugin-copyAsImage）：优先**直接取宿主里已经渲染好的
+ * SVG DOM 节点**（Visimer 画布 / ReadOnly 预览），经高分辨率画布转成 PNG/SVG，
+ * 避免重新 mermaid.render（规避了传 container 触发 insertLookDefs、懒加载时序等
+ * 渲染问题，也更快）。宿主未渲染出 SVG 时才回退到重新 render。
  */
 
 export interface ExporterOptions {
-  /** 获取当前 Mermaid 源码 */
+  /** 获取当前 Mermaid 源码（渲染兜底时使用） */
   getCode: () => string;
   /** mermaid 实例（带 render 方法，签名 render(id, text, container?)） */
   mermaid: {
     render: (id: string, code: string, container?: HTMLElement) => Promise<{ svg: string }>;
   };
+  /** 可选：宿主当前已渲染的 SVG 元素（Visimer 画布 / ReadOnly 预览）。有则直接用它导出，不再重新 render。 */
+  getSvgElement?: () => SVGSVGElement | null;
 }
 
 const EXPORTER_ID_PREFIX = "id";
@@ -78,9 +82,14 @@ export class Exporter {
    * @returns Blob type=image/svg+xml
    */
   async exportSVG(): Promise<Blob> {
-    const code = this.opts.getCode();
-    if (!code.trim()) throw new Error("Mermaid code is empty");
-    const svg = await this.renderWithRetry(code);
+    // 优先：直接取宿主已渲染的 SVG 节点导出，避免重新渲染
+    const svgEl = this.opts.getSvgElement?.() ?? null;
+    if (svgEl) {
+      return new Blob([Exporter.serializeSVG(svgEl)], { type: "image/svg+xml" });
+    }
+    // 兜底：重新 mermaid.render
+    Exporter.assertCode(this.opts.getCode());
+    const svg = await this.renderWithRetry(this.opts.getCode());
     return new Blob([svg], { type: "image/svg+xml" });
   }
 
@@ -91,9 +100,14 @@ export class Exporter {
    * @returns Blob type=image/png
    */
   async exportPNG(scale: 1 | 2 | 3 = 2): Promise<Blob> {
-    const code = this.opts.getCode();
-    if (!code.trim()) throw new Error("Mermaid code is empty");
-    const svg = await this.renderWithRetry(code);
+    // 优先：取宿主已渲染的 SVG 节点 → 高分辨率画布转 PNG（参考 copyAsImage）
+    const svgEl = this.opts.getSvgElement?.() ?? null;
+    if (svgEl) {
+      return Exporter.svgElementToPngBlob(svgEl, scale);
+    }
+    // 兜底：重新 mermaid.render
+    Exporter.assertCode(this.opts.getCode());
+    const svg = await this.renderWithRetry(this.opts.getCode());
     return Exporter.svgToPngBlob(svg, scale);
   }
 
@@ -190,6 +204,54 @@ export class Exporter {
       throw new Error("Mermaid 未返回有效的 SVG（渲染可能失败），无法导出");
     }
     return root;
+  }
+
+  /** 校验 Mermaid 源码非空（兜底 render 前调用）。 */
+  static assertCode(code: string): void {
+    if (!code.trim()) throw new Error("Mermaid code is empty");
+  }
+
+  /** 序列化 SVG 元素为 XML 字符串（参考 copyAsImage serializeSVG）。 */
+  static serializeSVG(svg: SVGSVGElement): string {
+    return new XMLSerializer().serializeToString(svg);
+  }
+
+  /**
+   * 把宿主已渲染的 SVG 元素转为高分辨率 PNG Blob（参考 copyAsImage getCanvasFromSVG）。
+   *
+   * clone SVG → 放大到 1920 宽并保持比例 → base64 data URI → Image → Canvas(scale 倍) → PNG。
+   * 直接复用宿主已渲染的节点，避免重新 mermaid.render。
+   *
+   * @param svgEl 已渲染的 SVG 元素
+   * @param scale 分辨率倍率（1/2/3）
+   */
+  static svgElementToPngBlob(svgEl: SVGSVGElement, scale: 1 | 2 | 3 = 2): Promise<Blob> {
+    const clone = svgEl.cloneNode(true) as SVGSVGElement;
+    const vb = svgEl.viewBox.baseVal;
+    const w = vb && vb.width ? vb.width : svgEl.clientWidth || 800;
+    const h = vb && vb.height ? vb.height : svgEl.clientHeight || 600;
+    const aspect = h > 0 ? w / h : 1;
+    const targetW = 1920;
+    const targetH = Math.round(targetW / aspect);
+    clone.setAttribute("width", String(targetW));
+    clone.setAttribute("height", String(targetH));
+    if (!clone.getAttribute("xmlns")) clone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+
+    const xml = Exporter.serializeSVG(clone);
+    const b64 = btoa(unescape(encodeURIComponent(xml)));
+    const img = new Image();
+    img.src = `data:image/svg+xml;base64,${b64}`;
+    return new Promise<Blob>((resolve, reject) => {
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.round(targetW * scale);
+        canvas.height = Math.round(targetH * scale);
+        const ctx = canvas.getContext("2d")!;
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("canvas.toBlob returned null"))), "image/png");
+      };
+      img.onerror = () => reject(new Error("SVG image failed to load"));
+    });
   }
 
   /**

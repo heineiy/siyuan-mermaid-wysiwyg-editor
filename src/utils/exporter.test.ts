@@ -42,6 +42,46 @@ describe("Exporter", () => {
       expect(mockRender).toHaveBeenCalledTimes(1);
       expect(mockRender).toHaveBeenCalledWith(expect.any(String), SAMPLE_CODE);
     });
+
+    it("有 getSvgElement → 直接用已渲染 SVG 导出，不调 mermaid.render", async () => {
+      const svgEl = document.createElementNS("http://www.w3.org/2000/svg", "svg") as unknown as SVGSVGElement;
+      svgEl.setAttribute("width", "120");
+      const exp2 = new Exporter({
+        getCode: () => SAMPLE_CODE,
+        mermaid: mockMermaid as any,
+        getSvgElement: () => svgEl,
+      });
+      const blob = await exp2.exportSVG();
+      expect(blob.type).toBe("image/svg+xml");
+      expect(await blob.text()).toContain("<svg");
+      expect(mockRender).not.toHaveBeenCalled();
+    });
+
+    it("getSvgElement 返回 null → 回退重新渲染", async () => {
+      const exp2 = new Exporter({
+        getCode: () => SAMPLE_CODE,
+        mermaid: mockMermaid as any,
+        getSvgElement: () => null,
+      });
+      await exp2.exportSVG();
+      expect(mockRender).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  // --- serializeSVG（取已渲染 SVG 出矢量） ---
+  describe("serializeSVG", () => {
+    it("序列化 SVG 元素为 XML 文本", () => {
+      const svgEl = document.createElementNS("http://www.w3.org/2000/svg", "svg") as unknown as SVGSVGElement;
+      svgEl.setAttribute("id", "g1");
+      const xml = Exporter.serializeSVG(svgEl);
+      expect(xml).toContain("<svg");
+      expect(xml).toContain('id="g1"');
+    });
+  });
+
+  // --- svgElementToPngBlob（取已渲染 SVG 栅格化，Canvas 依赖真实浏览器） ---
+  describe("svgElementToPngBlob", () => {
+    it.skip("真实浏览器中：把已渲染 SVG 元素转高分辨率 PNG（宿主联调手动验证）", async () => {});
   });
 
   // --- REQ-EXPORT-001: PNG 2x DPI ---

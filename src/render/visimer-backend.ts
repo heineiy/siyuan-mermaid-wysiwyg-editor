@@ -379,7 +379,12 @@ export class VisimerBackend implements RenderBackend {
     // 取 editor 的当前 mermaid 源码。editor 无 getCode()，正确 API 是 code getter（或 getText()）。
     const codeFn = () => (editor as any).code ?? (editor as any).getText?.() ?? "";
     const typeFn = () => (editor as any).result?.typeInfo?.id ?? "diagram";
-    toolbar.appendChild(buildExportDropdown({ getCode: codeFn, getType: typeFn, statusLabel: this.statusLabel }));
+    // 优先取画布里已渲染的 SVG 节点直接导出（无需重新 mermaid.render，参考 copyAsImage）
+    const svgElFn = () => {
+      const slot = layout.canvasSlot;
+      return slot ? (slot.querySelector("svg") as SVGSVGElement | null) : null;
+    };
+    toolbar.appendChild(buildExportDropdown({ getCode: codeFn, getType: typeFn, statusLabel: this.statusLabel, getSvgElement: svgElFn }));
 
     // Undo
     const undoBtn = makeBtn("↶ Undo", () => editor.undo());

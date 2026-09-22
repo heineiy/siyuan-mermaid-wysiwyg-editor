@@ -385,6 +385,8 @@ export class ReadOnlyAdapter implements DiagramAdapter {
     this.toolbar.appendChild(buildExportDropdown({
       getCode: () => this.textarea?.value ?? "",
       statusLabel: this.statusLabel,
+      // 优先取预览里已渲染的 SVG 节点直接导出（参考 copyAsImage）
+      getSvgElement: () => (this.previewSlot?.querySelector("svg") as SVGSVGElement | null) ?? null,
     }));
 
     // textarea 初始灌 code
