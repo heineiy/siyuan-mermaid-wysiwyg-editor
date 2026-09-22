@@ -20,29 +20,17 @@ export interface ExporterOptions {
   };
 }
 
-const EXPORTER_ID_PREFIX = "__exporter_" + Math.random().toString(36).slice(2, 8);
-
-/** 工具：自动生成唯一 id（避免多次 render 冲突） */
-const nextRenderId = () => EXPORTER_ID_PREFIX + "_" + Date.now() + "_" + Math.floor(Math.random() * 1000);
-
+const EXPORTER_ID_PREFIX = "id";
 /**
- * 工具：在 body 上创建一个临时 container，render 完成（无论成功失败）后 remove。
+ * 工具：自动生成唯一 id（避免多次 render 冲突）。
  *
- * mermaid v12 render(id, text, container?) — container 不传时会把 SVG
- * append 到 document.body，**污染思源主窗口 DOM**。必须传临时容器。
+ * 注意：id 格式必须能被 mermaid 的 `select('[id="..."]')` 属性选择器命中。
+ * 实测以 `__` 开头的 id（如上轮的 `__exporter_<rand>_<ts>`）会导致
+ * flowchart 的 getDiagramElement 从 body 查不到 SVG，触发
+ * `Cannot read properties of null (reading 'getAttribute')`。
+ * 改为字母开头的干净格式后正常。
  */
-function withTempContainer<T>(fn: (container: HTMLElement) => Promise<T>): Promise<T> {
-  const container = document.createElement("div");
-  container.style.position = "fixed";
-  container.style.left = "-9999px";
-  container.style.top = "0";
-  document.body.appendChild(container);
-  try {
-    return fn(container);
-  } finally {
-    if (container.parentNode) container.parentNode.removeChild(container);
-  }
-}
+const nextRenderId = () => `${EXPORTER_ID_PREFIX}-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
 
 export class Exporter {
   private readonly opts: ExporterOptions;
@@ -56,17 +44,18 @@ export class Exporter {
   /**
    * 渲染 SVG 字符串，遇 mermaid 懒加载时序错误自动重试。
    *
-   * mermaid 12 按需加载各图类型的渲染器（flowchart/sequence/... 子 chunk）。
-   * 首次或高并发渲染时，SVG 可能未完全挂载就执行 insertLookDefs 等步骤，
-   * 抛 `Cannot read properties of null (reading 'getAttribute')` 或
-   * `svg element not in render tree`。这些是**瞬态**错误——渲染器注册完成后
-   * 重试通常成功。这里最多重试 3 次，其余错误直接上抛。
+   * 采用 mermaid 官方默认：**不传 container**。mermaid 会自动把临时节点挂到
+   * body 并在渲染完成后自行移除，无需宿主管理。此前曾传自定义 container，
+   * 实测在真实环境触发 flowchart 的 `insertLookDefs` 读到 null SVG 元素
+   * （`Cannot read properties of null (reading 'getAttribute')`）。
+   *
+   * mermaid 12 按需加载各图类型渲染器，首次/高并发可能瞬态失败，重试可救回。
    */
-  private async renderWithRetry(code: string, container: HTMLElement): Promise<string> {
+  private async renderWithRetry(code: string): Promise<string> {
     let lastErr: unknown;
     for (let attempt = 0; attempt < 3; attempt++) {
       try {
-        const { svg } = await this.opts.mermaid.render(nextRenderId(), code, container);
+        const { svg } = await this.opts.mermaid.render(nextRenderId(), code);
         if (!svg.trim()) throw new Error("Mermaid render returned empty SVG");
         return svg;
       } catch (err) {
@@ -74,7 +63,6 @@ export class Exporter {
         const msg = err instanceof Error ? err.message : String(err);
         const transient = /getAttribute|not in render tree|undefined\n|UnknownDiagram|no diagram type/i.test(msg);
         if (transient && attempt < 2) {
-          // 等渲染器子模块加载完成再试
           await new Promise((r) => setTimeout(r, 120));
           continue;
         }
@@ -92,10 +80,8 @@ export class Exporter {
   async exportSVG(): Promise<Blob> {
     const code = this.opts.getCode();
     if (!code.trim()) throw new Error("Mermaid code is empty");
-    return withTempContainer(async (container) => {
-      const svg = await this.renderWithRetry(code, container);
-      return new Blob([svg], { type: "image/svg+xml" });
-    });
+    const svg = await this.renderWithRetry(code);
+    return new Blob([svg], { type: "image/svg+xml" });
   }
 
   /**
@@ -107,10 +93,8 @@ export class Exporter {
   async exportPNG(scale: 1 | 2 | 3 = 2): Promise<Blob> {
     const code = this.opts.getCode();
     if (!code.trim()) throw new Error("Mermaid code is empty");
-    return withTempContainer(async (container) => {
-      const svg = await this.renderWithRetry(code, container);
-      return Exporter.svgToPngBlob(svg, scale);
-    });
+    const svg = await this.renderWithRetry(code);
+    return Exporter.svgToPngBlob(svg, scale);
   }
 
   // ---------- 下载 + 复制 ----------
