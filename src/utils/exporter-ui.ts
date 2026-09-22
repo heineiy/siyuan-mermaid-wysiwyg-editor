@@ -69,11 +69,18 @@ export function buildExportDropdown(opts: ExportDropdownOptions): HTMLElement {
     padding: "4px 0", overflow: "hidden",
   });
 
-  const showError = (msg: string) => {
+  const showError = (err: unknown) => {
     if (!statusLabel) return;
+    const msg = err instanceof Error ? err.message : String(err);
+    const stack = err instanceof Error ? err.stack : undefined;
     statusLabel.classList.remove("mw-status-ok");
     statusLabel.classList.add("mw-status-error");
     statusLabel.textContent = `Export failed: ${msg}`;
+    if (stack) {
+      // hover 状态栏可看完整堆栈；同步打 console 便于用户从 DevTools 复制
+      statusLabel.title = stack;
+      console.error("[siyuan-mermaid] Export failed:", err);
+    }
   };
 
   const mkItem = (label: string, action: () => Promise<void>, danger = false) => {
@@ -100,8 +107,7 @@ export function buildExportDropdown(opts: ExportDropdownOptions): HTMLElement {
       try {
         await action();
       } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        showError(msg);
+        showError(err);
       }
     });
     menu.appendChild(item);
