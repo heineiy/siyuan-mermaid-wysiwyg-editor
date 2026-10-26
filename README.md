@@ -131,11 +131,10 @@ npm install
 # 3. 构建（自动产出 dist/ + 根目录 package.zip）
 npm run build
 
-# 4. 从 GitHub Release 下载 package.zip，解压后把目录改名为
-#    "mermaid-wysiwyg-editor"，丢进思源 plugins 目录：
-#    macOS:   ~/Library/Application Support/Siyuan/conf/plugins/
-#    Windows: %APPDATA%\SiYuan\conf\plugins\
-#    Linux:   ~/.config/SiYuan/conf/plugins/
+# 4. 安装到当前工作空间的 data/plugins 目录（目录名必须与 plugin.json 的 name 一致）：
+#    <工作空间>/data/plugins/siyuan-mermaid-wysiwyg-editor/
+#    例如 macOS 默认工作空间：~/SiYuan/data/plugins/siyuan-mermaid-wysiwyg-editor/
+#    工作空间路径可在 思源 → 设置 → 关于 → 工作空间 查看
 #    要求目录内含 index.js / plugin.json / icon.png / preview.png
 
 # 5. 在思源 → 设置 → 关于 → 重载插件

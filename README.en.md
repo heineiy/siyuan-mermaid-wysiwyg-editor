@@ -131,11 +131,11 @@ npm install
 # 3. Build (auto-produces dist/ + package.zip at project root)
 npm run build
 
-# 4. Download package.zip from a GitHub Release, extract it, rename the directory to
-#    "mermaid-wysiwyg-editor", and drop it into the Siyuan plugins folder:
-#    macOS:   ~/Library/Application Support/Siyuan/conf/plugins/
-#    Windows: %APPDATA%\SiYuan\conf\plugins\
-#    Linux:   ~/.config/SiYuan/conf/plugins/
+# 4. Install into the current workspace's data/plugins directory
+#    (the folder name must match plugin.json's "name"):
+#    <workspace>/data/plugins/siyuan-mermaid-wysiwyg-editor/
+#    e.g. default macOS workspace: ~/SiYuan/data/plugins/siyuan-mermaid-wysiwyg-editor/
+#    Find the workspace path in Siyuan → Settings → About → Workspace
 #    Required files inside: index.js / plugin.json / icon.png / preview.png
 
 # 5. Reload plugins from Siyuan → Settings → About → Reload Plugins
