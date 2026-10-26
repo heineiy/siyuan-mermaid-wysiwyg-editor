@@ -2,7 +2,8 @@
 
 > Siyuan Note plugin —— bring bidirectional visual editing to your Mermaid code blocks.
 
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.x-blue)](https://www.typescriptlang.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-6.x-blue)](https://www.typescriptlang.org/)
+[![Vite](https://img.shields.io/badge/Vite-7.x-646CFF)](https://vitejs.dev/)
 [![Mermaid](https://img.shields.io/badge/Mermaid-12.x-ff3670)](https://mermaid.js.org/)
 [![Visimer](https://img.shields.io/badge/Visimer-1.1.x-7c3aed)](https://github.com/visimer/visimer)
 [![License](https://img.shields.io/badge/License-MIT-green)](./LICENSE)
@@ -23,7 +24,7 @@ Visimer is developed by the [inkeep](https://github.com/inkeep) team. Repository
 - Siyuan hotkey system (`plugin.addCommand`)
 - Siyuan block-icon menu (`click-blockicon` event)
 - Siyuan kernel API (`fetchSyncPost` for block read/write)
-- Native DOM toolbar (Select / Connect / +Node / Undo / Redo)
+- Native DOM toolbar (Select / Connect / +Node / Undo / Redo / Export)
 
 ## ✨ Features
 
@@ -52,7 +53,7 @@ Visimer is developed by the [inkeep](https://github.com/inkeep) team. Repository
 | **Select entity** | Click node / edge |
 | **Edit properties** | Click → Popover appears: shape, arrow, line style, color |
 | **Edit label** | Double-click entity → Inline Editor |
-| **Delete entity** | Select + `Delete` / `Backspace` or toolbar `🗑 Delete` |
+| **Delete entity** | Select + `Delete` / `Backspace` |
 | **Create edge** | Switch to `Connect` tool → drag from node A to node B |
 | **Add node** | Toolbar `+ Node` dropdown → auto-append to graph |
 | **Switch direction** (flowchart) | Toolbar `TD/LR/BT/RL` dropdown |
@@ -61,6 +62,32 @@ Visimer is developed by the [inkeep](https://github.com/inkeep) team. Repository
 | **Pan canvas** | Drag empty area |
 | **Zoom canvas** | `Ctrl + wheel` or bottom-right zoom controls |
 | **Auto-fit** | Bottom-right `⛶` button / auto fitView on open |
+
+### 🔗 Connect Tool (with Continuous Edge Lock)
+
+Default behavior: after drawing one edge, the tool auto-returns to Select mode — ideal for single-edge scenarios.
+When locked: stays in Connect mode after each edge, so you can repeatedly drag from any node. Press `Esc` or click the Connect tool again to exit.
+
+### 📤 High-Resolution Export
+
+The `Export` dropdown in the toolbar offers four options:
+
+| Export Option | Description |
+|---------------|-------------|
+| **Download PNG (2×)** | High-resolution PNG file at 2× DPI |
+| **Download SVG** | Original vector SVG file |
+| **Copy as PNG Image** | Directly to clipboard — paste into WeChat, docs, etc. |
+| **Copy SVG Source** | Copy the raw SVG XML |
+
+Export prioritizes pre-rendered SVG nodes on the canvas (no DOM container pollution, no mermaid lazy-loading race). Falls back to re-rendering with automatic retry (≤3 attempts).
+
+### 🌐 Internationalization
+
+UI strings (tool buttons, menu items, status bar, error messages) auto-switch with Siyuan's language:
+- `<html lang="zh-CN">` → 中文
+- `<html lang="en">` / default → English
+
+No restart needed — close and reopen the editor window after changing Siyuan's language.
 
 ### 📝 Code Panel (CodeMirror with Syntax Highlighting)
 
@@ -95,19 +122,21 @@ Siyuan → Settings → Marketplace → Search "Mermaid WYSIWYG Editor" → Inst
 
 ```bash
 # 1. Clone
-git clone https://github.com/your-org/siyuan-mermaid-wysiwyg-editor.git
+git clone https://github.com/heineiy/siyuan-mermaid-wysiwyg-editor.git
 cd siyuan-mermaid-wysiwyg-editor
 
 # 2. Install dependencies
 npm install
 
-# 3. Build (output: dist/index.js — single-file CJS artifact)
+# 3. Build (auto-produces dist/ + package.zip at project root)
 npm run build
 
-# 4. Copy to Siyuan plugin directory
-# macOS:   ~/Library/Application Support/Siyuan/conf/plugins/mermaid-wysiwyg-editor/
-# Windows: %APPDATA%\SiYuan\conf\plugins\mermaid-wysiwyg-editor\
-cp -r dist/* ~/Library/Application\ Support/Siyuan/conf/plugins/mermaid-wysiwyg-editor/
+# 4. Download package.zip from a GitHub Release, extract it, rename the directory to
+#    "mermaid-wysiwyg-editor", and drop it into the Siyuan plugins folder:
+#    macOS:   ~/Library/Application Support/Siyuan/conf/plugins/
+#    Windows: %APPDATA%\SiYuan\conf\plugins\
+#    Linux:   ~/.config/SiYuan/conf/plugins/
+#    Required files inside: index.js / plugin.json / icon.png / preview.png
 
 # 5. Reload plugins from Siyuan → Settings → About → Reload Plugins
 ```
@@ -122,6 +151,7 @@ cp -r dist/* ~/Library/Application\ Support/Siyuan/conf/plugins/mermaid-wysiwyg-
 | `Ctrl+Y` | Redo | Canvas & code panel (shared stack) |
 | `Ctrl + Wheel` | Zoom canvas | Over canvas |
 | `Drag canvas` | Pan canvas | Drag empty area |
+| `Esc` | Exit Connect lock | Continuous edge mode |
 
 > **Customizing shortcuts**: Siyuan → Settings → Plugins → Mermaid WYSIWYG → Visual Edit Shortcut → Record new key combo → Save.
 
@@ -187,17 +217,18 @@ Siyuan reserves these combos by default:
    │  @visimer/core       MermaidWysiwygEditor │  headless engine
    │  @visimer/dom        MermaidCanvasView    │  interactive canvas
    │  @visimer/codemirror MermaidCodeMirror    │  official code panel
-   │  mermaid@12          fallback renderer    │  readonly + type detection
+   │  mermaid@12          fallback + export    │  readonly rendering + type detection
    └──────────────────────────────────────────┘
 ```
 
 ### Three Layers + Replaceable Interface
 
-| Layer | File | Responsibility |
-|-------|------|----------------|
-| **Controller** | `controller/sync.ts`, `dialog.ts`, `shortcut.ts` | Host bridging, Dialog lifecycle, trigger sources |
-| **Adapters** | `adapters/registry.ts`, `visimer-full-adapter.ts`, `readonly-adapter.ts` | Capability routing, adapter interface |
-| **Render** | `render/visimer-backend.ts`, `render/backend.ts` | `RenderBackend` interface + Visimer implementation |
+| Layer | Files | Responsibility |
+|-------|-------|----------------|
+| **Controller** | `sync.ts`, `dialog.ts`, `shortcut.ts`, `trigger.ts` | Host bridging, Dialog lifecycle, trigger sources |
+| **Adapters** | `registry.ts`, `visimer-full-adapter.ts`, `readonly-adapter.ts` | Capability routing, adapter interface |
+| **Render** | `visimer-backend.ts`, `backend.ts` | `RenderBackend` interface + Visimer implementation |
+| **Utils** | `exporter.ts`, `exporter-ui.ts`, `i18n.ts` | High-res export pipeline, export dropdown, i18n |
 
 ### Adapter Registration (Loop over 22 types)
 
@@ -219,14 +250,11 @@ registry.register(new ReadOnlyAdapter());  // wildcard fallback
 ### Commands
 
 ```bash
-npm install               # Install dependencies
-npm run dev               # Vite dev mode (watch build)
-npm run build             # Production build → dist/index.js (single-file CJS)
-npm test                  # Unit tests (Vitest)
-npm run test:acceptance   # Acceptance tests
-npm run typecheck         # TypeScript type-check only
-npm run lint              # ESLint
-npm run verify:acceptance # Full acceptance suite
+npm install                # Install dependencies
+npm run dev                # Vite dev mode (watch build → dist/index.js)
+npm run build              # Production build (single-file CJS + auto package.zip at root)
+npm test                   # Unit tests (Vitest)
+npm run verify:acceptance  # Acceptance suite
 ```
 
 ### Dependencies
@@ -236,9 +264,12 @@ npm run verify:acceptance # Full acceptance suite
 | `@visimer/core` | ^1.1.2 | Visimer headless editing engine |
 | `@visimer/dom` | ^1.1.2 | Visimer interactive canvas |
 | `@visimer/codemirror` | ^1.1.2 | Visimer official code panel |
+| `@codemirror/commands` | ^6.11 | CodeMirror commands (Undo/Redo) |
+| `@codemirror/language` | ^6.12 | CodeMirror language highlighting |
+| `@codemirror/state` | ^6.7 | CodeMirror state management |
+| `@codemirror/view` | ^6.43 | CodeMirror view layer |
 | `mermaid` | ^12.0.0 | Mermaid rendering core + type detection |
-| `siyuan` | ^0.0.1 | Siyuan types + `fetchSyncPost` |
-| `@codemirror/*` | ^6.x | CodeMirror 6 (required by MermaidCodeMirror) |
+| `siyuan` | 1.2.7 | Siyuan types + `fetchSyncPost` |
 
 ## 📚 Project Structure
 
@@ -248,12 +279,20 @@ siyuan-mermaid-wysiwyg-editor/
 │   ├── controller/         # Host bridge: sync / dialog / shortcut / trigger / settings
 │   ├── adapters/           # Adapter layer: registry / visimer-full-adapter / readonly-adapter
 │   ├── render/             # Render layer: backend interface + visimer-backend implementation
+│   ├── utils/              # Utilities: exporter / exporter-ui / i18n / fence
 │   ├── __tests__/          # Shared fixtures
 │   ├── acceptance/         # Acceptance tests
 │   └── index.ts            # Plugin entry (onload wires everything)
-├── dist/index.js           # Build artifact (single-file CJS, Siyuan loader requirement)
+├── dist/                   # Build artifact (single-file CJS + static assets)
+│   ├── index.js            #   Main entry
+│   ├── plugin.json         #   Manifest
+│   ├── icon.png            #   Icon
+│   ├── preview.png         #   Preview image
+│   └── README.md / LICENSE #   Docs
+├── package.zip             # Root-level bundle (auto from vite-plugin-zip-pack)
 ├── plugin.json             # Siyuan plugin manifest
-├── vite.config.mts         # Vite config (inlineDynamicImports + named exports)
+├── vite.config.mts         # Vite config (inlineDynamicImports + named exports + zipPack)
+├── gh_release.sh           # One-click release (extracts CHANGELOG section + uploads package.zip)
 └── tsconfig.json
 ```
 
@@ -262,9 +301,9 @@ siyuan-mermaid-wysiwyg-editor/
 | Limitation | Reason |
 |------------|--------|
 | **zenuml** is read-only | Visimer designed it as render-only |
-| **GitGraph** drag nodes not supported | Branch-centric; Visimer only edits text |
 | **Siyuan version** requirement | ≥ 3.8.0 (uses `fetchSyncPost` + `click-blockicon` event) |
-| **Build artifact 10.6MB** | Includes CodeMirror + Visimer + Mermaid (no tree-shaking possible) |
+| **Build artifact ~10.7MB** | Includes CodeMirror + Visimer + Mermaid (no tree-shaking possible) |
+| **No dynamic import() at runtime** | Siyuan plugins run in CJS — `inlineDynamicImports` in rollup keeps everything inlined |
 
 ## 📄 License
 

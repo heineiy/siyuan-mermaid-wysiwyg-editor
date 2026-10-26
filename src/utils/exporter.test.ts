@@ -79,6 +79,88 @@ describe("Exporter", () => {
     });
   });
 
+  const SVG_NS = "http://www.w3.org/2000/svg";
+  const makeSvg = (attrs: Record<string, string> = {}): SVGSVGElement => {
+    const el = document.createElementNS(SVG_NS, "svg") as SVGSVGElement;
+    for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, v);
+    return el;
+  };
+
+  // --- 视口读取（导出裁剪的基础） ---
+  describe("readViewBox", () => {
+    it("优先解析 viewBox", () => {
+      expect(Exporter.readViewBox(makeSvg({ viewBox: "-8 -8 139 61" }))).toEqual({
+        x: -8, y: -8, width: 139, height: 61,
+      });
+    });
+
+    it("无 viewBox 时退回数值 width/height", () => {
+      expect(Exporter.readViewBox(makeSvg({ width: "400", height: "300px" }))).toEqual({
+        x: 0, y: 0, width: 400, height: 300,
+      });
+    });
+
+    it("百分比尺寸且无 viewBox → null（不做裁剪）", () => {
+      expect(Exporter.readViewBox(makeSvg({ width: "100%", height: "100%" }))).toBeNull();
+    });
+  });
+
+  // --- 紧凑视口计算 ---
+  describe("computeTightBox", () => {
+    const current = { x: 0, y: 0, width: 400, height: 300 };
+
+    it("按内容包围盒收缩，四边留 padding", () => {
+      expect(Exporter.computeTightBox({ x: 20, y: 10, width: 100, height: 50 }, current, 2)).toEqual({
+        x: 18, y: 8, width: 104, height: 54,
+      });
+    });
+
+    it("内容无效（未测到 / 全 0）→ 回退原视口", () => {
+      expect(Exporter.computeTightBox(null, current, 2)).toBe(current);
+      expect(Exporter.computeTightBox({ x: 0, y: 0, width: 0, height: 0 }, current, 2)).toBe(current);
+      expect(Exporter.computeTightBox({ x: NaN, y: 0, width: 10, height: 10 }, current, 2)).toBe(current);
+    });
+  });
+
+  // --- 视口收缩（消除导出图四周空白） ---
+  describe("normalizeSvgBounds", () => {
+    it("可测量内容 → viewBox/width/height 收缩到图形边界", () => {
+      const el = makeSvg({ viewBox: "0 0 400 300", width: "100%", style: "max-width: 400px;" });
+      const proto = Object.getPrototypeOf(el) as any;
+      const saved = Object.getOwnPropertyDescriptor(proto, "getBBox");
+      proto.getBBox = () => ({ x: 20, y: 10, width: 100, height: 50 });
+      try {
+        const out = Exporter.normalizeSvgBounds(el);
+        expect(out.getAttribute("viewBox")).toBe("18 8 104 54");
+        expect(out.getAttribute("width")).toBe("104");
+        expect(out.getAttribute("height")).toBe("54");
+        expect(out.style.width).toBe("104px");
+      } finally {
+        if (saved) Object.defineProperty(proto, "getBBox", saved);
+        else delete proto.getBBox;
+      }
+    });
+
+    it("测量不可用 → 原样保留视口（导出不因裁剪失败而中断）", () => {
+      const el = makeSvg({ viewBox: "0 0 400 300" });
+      const out = Exporter.normalizeSvgBounds(el);
+      expect(out.getAttribute("viewBox")).toBe("0 0 400 300");
+    });
+  });
+
+  // --- 内容包围盒测量（含根 svg 不支持 getBBox 时的子元素回退） ---
+  describe("measureContentBox", () => {
+    it("根 svg 无有效 bbox → 合并直接子元素包围盒", () => {
+      const el = makeSvg({ viewBox: "0 0 400 300" });
+      (el as any).getBBox = () => ({ x: 0, y: 0, width: 0, height: 0 });
+      const g = document.createElementNS(SVG_NS, "g") as any;
+      g.getBBox = () => ({ x: 30, y: 40, width: 50, height: 20 });
+      el.appendChild(g);
+
+      expect(Exporter.measureContentBox(el)).toEqual({ x: 30, y: 40, width: 50, height: 20 });
+    });
+  });
+
   // --- svgElementToPngBlob（取已渲染 SVG 栅格化，Canvas 依赖真实浏览器） ---
   describe("svgElementToPngBlob", () => {
     it.skip("真实浏览器中：把已渲染 SVG 元素转高分辨率 PNG（宿主联调手动验证）", async () => {});

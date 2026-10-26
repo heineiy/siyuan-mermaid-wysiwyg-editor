@@ -1,8 +1,9 @@
 # 思源 Mermaid 可视化编辑插件
 
-> Siyuan Note 插件 —— 为 Mermaid 代码块提供所见即所得的双向可视化编辑体验。
+> 思源笔记插件 —— 为 Mermaid 代码块提供所见即所得的双向可视化编辑体验。
 
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.x-blue)](https://www.typescriptlang.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-6.x-blue)](https://www.typescriptlang.org/)
+[![Vite](https://img.shields.io/badge/Vite-7.x-646CFF)](https://vitejs.dev/)
 [![Mermaid](https://img.shields.io/badge/Mermaid-12.x-ff3670)](https://mermaid.js.org/)
 [![Visimer](https://img.shields.io/badge/Visimer-1.1.x-7c3aed)](https://github.com/visimer/visimer)
 [![License](https://img.shields.io/badge/License-MIT-green)](./LICENSE)
@@ -13,7 +14,7 @@
 一个 Mermaid WYSIWYG 编辑器的 headless 引擎 + 交互式画布框架。Visimer 提供了：
 
 - **`@visimer/core`** — 纯 TypeScript headless 编辑引擎，把 Mermaid 文本编译成可编辑的 AST，再从 AST 编译回文本（双向同步的关键）
-- **`@visimer/dom`** — 交互式画布（MermaidCanvasView），内置 Select/Connect 工具、popover 属性面板、Plus 按钮、panZoom、fitView
+- **`@visimer/dom`** — 交互式画布（`MermaidCanvasView`），内置 Select/Connect 工具、popover 属性面板、Plus 按钮、panZoom、fitView
 - **`@visimer/codemirror`** — 官方代码面板，语法高亮 + entity 高亮 + 共享 undo 栈
 
 Visimer 由 [inkeep](https://github.com/inkeep) 团队开发，开源仓库：
@@ -23,7 +24,7 @@ Visimer 由 [inkeep](https://github.com/inkeep) 团队开发，开源仓库：
 - 思源快捷键系统（`plugin.addCommand`）
 - 思源 block-icon 菜单（`click-blockicon` 事件）
 - 思源内核 API（`fetchSyncPost` 读写块）
-- 原生 DOM 工具栏（Select/Connect/+Node/Undo/Redo）
+- 原生 DOM 工具栏（Select / Connect / +Node / Undo / Redo / Export）
 
 ## ✨ 功能特性
 
@@ -52,7 +53,7 @@ Visimer 由 [inkeep](https://github.com/inkeep) 团队开发，开源仓库：
 | **选中实体** | 单击节点/连线 |
 | **改属性** | 选中后弹出 Popover：形状、箭头、线条样式、颜色 |
 | **改文字** | 双击实体 → Inline Editor |
-| **删除实体** | 选中后按 `Delete` / `Backspace` 或工具栏 `🗑 Delete` |
+| **删除实体** | 选中后按 `Delete` / `Backspace` |
 | **新建连线** | 切换到 `Connect` 工具 → 从节点 A 拖到节点 B |
 | **新建节点** | 工具栏 `+ Node` 下拉选形状 → 自动追加到图上 |
 | **切换方向** (flowchart) | 工具栏 `TD/LR/BT/RL` 下拉 |
@@ -61,6 +62,32 @@ Visimer 由 [inkeep](https://github.com/inkeep) 团队开发，开源仓库：
 | **平移画布** | 拖空白处 |
 | **缩放画布** | `Ctrl + 滚轮` 或右下角缩放控件 |
 | **自动适配** | 右下角 `⛶` 按钮 / 首次打开自动 fitView |
+
+### 🔗 连线工具（含连续连线锁定）
+
+默认行为：连完一条线后自动返回 Select 模式，适合单条连线场景。
+开启锁定后：连完一条线仍停留在 Connect 模式，可持续从不同节点拖出连线，按 `Esc` 或再次点击 Connect 工具退出。
+
+### 📤 高清导出
+
+工具栏 `Export` 下拉菜单提供四种导出方式：
+
+| 导出方式 | 说明 |
+|----------|------|
+| **下载 PNG（2×）** | 高分辨率 PNG 文件，默认 2 倍 DPI |
+| **下载 SVG** | 原始矢量 SVG 文件 |
+| **复制 PNG 图片** | 直接复制到系统剪贴板，粘贴到微信/文档 |
+| **复制 SVG 代码** | 复制 SVG 的 XML 源码 |
+
+导出优先使用画布已渲染的 SVG 节点（无容器污染、无 mermaid 懒加载时序问题），失败时回退到重新渲染（含自动重试 ≤3 次）。
+
+### 🌐 国际化
+
+界面文案（工具按钮、菜单、状态栏、错误提示）随思源语言自动切换：
+- `<html lang="zh-CN">` → 中文
+- `<html lang="en">` / 默认 → English
+
+无需重启，切换思源语言后重新打开编辑窗口即可生效。
 
 ### 📝 代码面板（CodeMirror 语法高亮）
 
@@ -95,19 +122,21 @@ Visimer 由 [inkeep](https://github.com/inkeep) 团队开发，开源仓库：
 
 ```bash
 # 1. 克隆
-git clone https://github.com/your-org/siyuan-mermaid-wysiwyg-editor.git
+git clone https://github.com/heineiy/siyuan-mermaid-wysiwyg-editor.git
 cd siyuan-mermaid-wysiwyg-editor
 
 # 2. 安装依赖
 npm install
 
-# 3. 构建（输出到 dist/index.js —— 单文件 CJS 产物）
+# 3. 构建（自动产出 dist/ + 根目录 package.zip）
 npm run build
 
-# 4. 拷贝到思源插件目录
-# macOS: ~/Library/Application Support/Siyuan/conf/plugins/mermaid-wysiwyg-editor/
-# Windows: %APPDATA%\SiYuan\conf\plugins\mermaid-wysiwyg-editor\
-cp -r dist/* ~/Library/Application\ Support/Siyuan/conf/plugins/mermaid-wysiwyg-editor/
+# 4. 从 GitHub Release 下载 package.zip，解压后把目录改名为
+#    "mermaid-wysiwyg-editor"，丢进思源 plugins 目录：
+#    macOS:   ~/Library/Application Support/Siyuan/conf/plugins/
+#    Windows: %APPDATA%\SiYuan\conf\plugins\
+#    Linux:   ~/.config/SiYuan/conf/plugins/
+#    要求目录内含 index.js / plugin.json / icon.png / preview.png
 
 # 5. 在思源 → 设置 → 关于 → 重载插件
 ```
@@ -122,6 +151,7 @@ cp -r dist/* ~/Library/Application\ Support/Siyuan/conf/plugins/mermaid-wysiwyg-
 | `Ctrl+Y` | 重做 | 画布/代码面板共用 |
 | `Ctrl + 滚轮` | 缩放画布 | 画布中 |
 | `Drag canvas` | 平移画布 | 画布空白处拖拽 |
+| `Esc` | 退出 Connect 锁定 | 连续连线锁定中 |
 
 > **快捷键自定义**：思源 → 设置 → 插件 → Mermaid WYSIWYG → 可视化编辑快捷键 → 录制新组合键 → 保存。
 
@@ -139,7 +169,7 @@ cp -r dist/* ~/Library/Application\ Support/Siyuan/conf/plugins/mermaid-wysiwyg-
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                     Siyuan Note 宿主                        │
+│                     思源笔记 宿主                          │
 │  block-icon 菜单  |  Shift+Alt+M 快捷键  |  onload 生命周期  │
 └─────────────────────────┬───────────────────────────────────┘
                           │
@@ -187,7 +217,7 @@ cp -r dist/* ~/Library/Application\ Support/Siyuan/conf/plugins/mermaid-wysiwyg-
    │  @visimer/core    MermaidWysiwygEditor   │  headless 编辑引擎
    │  @visimer/dom     MermaidCanvasView      │  交互式画布（panZoom + popover）
    │  @visimer/codemirror MermaidCodeMirror   │  官方代码面板（语法高亮 + 共享 undo）
-   │  mermaid@12       只读渲染               │  兜底 + 类型判断
+   │  mermaid@12       只读渲染 + 导出兜底    │  兜底 + 类型判断 + 重新渲染回退
    └──────────────────────────────────────────┘
 ```
 
@@ -195,9 +225,10 @@ cp -r dist/* ~/Library/Application\ Support/Siyuan/conf/plugins/mermaid-wysiwyg-
 
 | 层 | 文件 | 职责 |
 |----|------|------|
-| **Controller** | `controller/sync.ts`, `controller/dialog.ts`, `controller/shortcut.ts` | 宿主桥接、Dialog 生命周期、触发源 |
-| **Adapters** | `adapters/registry.ts`, `adapters/visimer-full-adapter.ts`, `adapters/readonly-adapter.ts` | 能力路由（full/readonly）、适配器接口 |
+| **Controller** | `controller/sync.ts`, `dialog.ts`, `shortcut.ts`, `trigger.ts` | 宿主桥接、Dialog 生命周期、触发源 |
+| **Adapters** | `adapters/registry.ts`, `visimer-full-adapter.ts`, `readonly-adapter.ts` | 能力路由（full/readonly）、适配器接口 |
 | **Render** | `render/visimer-backend.ts`, `render/backend.ts` | RenderBackend 接口 + Visimer 实现 |
+| **Utils** | `utils/exporter.ts`, `utils/exporter-ui.ts`, `utils/i18n.ts` | 高清导出管线、导出下拉菜单、国际化 |
 
 ### 适配器注册（循环 22 种）
 
@@ -220,13 +251,10 @@ registry.register(new ReadOnlyAdapter());  // 通配兜底
 
 ```bash
 npm install        # 安装依赖
-npm run dev        # Vite 开发模式（watch 构建）
-npm run build      # 生产构建 → dist/index.js（单文件 CJS）
+npm run dev        # Vite 开发模式（watch 构建 → dist/index.js）
+npm run build      # 生产构建（单文件 CJS dist/index.js + 自动产出根目录 package.zip）
 npm test           # 单元测试（Vitest）
-npm run test:acceptance   # 验收用例
-npm run typecheck  # 仅 TypeScript 类型检查
-npm run lint       # ESLint
-npm run verify:acceptance # 完整验收套件
+npm run verify:acceptance   # 验收用例
 ```
 
 ### 依赖
@@ -236,9 +264,12 @@ npm run verify:acceptance # 完整验收套件
 | `@visimer/core` | ^1.1.2 | Visimer headless 编辑引擎 |
 | `@visimer/dom` | ^1.1.2 | Visimer 交互式画布 |
 | `@visimer/codemirror` | ^1.1.2 | Visimer 官方代码面板 |
+| `@codemirror/commands` | ^6.11 | CodeMirror 命令（Undo/Redo） |
+| `@codemirror/language` | ^6.12 | CodeMirror 语言高亮 |
+| `@codemirror/state` | ^6.7 | CodeMirror 状态管理 |
+| `@codemirror/view` | ^6.43 | CodeMirror 视图 |
 | `mermaid` | ^12.0.0 | Mermaid 渲染内核 + 类型判断 |
-| `siyuan` | ^0.0.1 | 思源类型定义 + fetchSyncPost |
-| `@codemirror/*` | ^6.x | CodeMirror 6（MermaidCodeMirror 依赖） |
+| `siyuan` | 1.2.7 | 思源类型定义 + `fetchSyncPost` |
 
 ## 📚 目录结构
 
@@ -248,12 +279,20 @@ siyuan-mermaid-wysiwyg-editor/
 │   ├── controller/         # 宿主桥接：sync / dialog / shortcut / trigger / settings
 │   ├── adapters/           # 适配器层：registry / visimer-full-adapter / readonly-adapter
 │   ├── render/             # 渲染层：backend 接口 + visimer-backend 实现
+│   ├── utils/              # 工具：exporter / exporter-ui / i18n / fence
 │   ├── __tests__/          # 共享 fixture
 │   ├── acceptance/         # 验收用例
 │   └── index.ts            # 插件入口（onload 组装全部模块）
-├── dist/index.js           # 构建产物（单文件 CJS，思源加载器要求）
+├── dist/                   # 构建产物（单文件 CJS + 静态资源）
+│   ├── index.js            #   入口脚本
+│   ├── plugin.json         #   清单
+│   ├── icon.png            #   图标
+│   ├── preview.png         #   预览图
+│   └── README.md / LICENSE #   文档
+├── package.zip             # 根目录打包（vite-plugin-zip-pack 自动产出）
 ├── plugin.json             # 思源插件清单
-├── vite.config.mts         # Vite 配置（inlineDynamicImports + named exports）
+├── vite.config.mts         # Vite 配置（inlineDynamicImports + named exports + zipPack）
+├── gh_release.sh           # 一键发布（提取 CHANGELOG 对应版本段 + 上传 package.zip）
 └── tsconfig.json
 ```
 
@@ -262,9 +301,9 @@ siyuan-mermaid-wysiwyg-editor/
 | 限制 | 原因 |
 |------|------|
 | **zenuml** 仅只读 | Visimer 设计为 render-only |
-| **不支持 GitGraph 拖拽** | GitGraph 是 branch-centric 图，Visimer 只做文本编辑 |
-| **思源版本要求** | ≥ 3.8.0（使用 fetchSyncPost + click-blockicon 事件） |
-| **产物 10.6MB** | 含完整 CodeMirror + Visimer + Mermaid（无法 tree-shake） |
+| **思源版本要求** | ≥ 3.8.0（使用 `fetchSyncPost` + `click-blockicon` 事件） |
+| **产物 ~10.7MB** | 含完整 CodeMirror + Visimer + Mermaid（无法 tree-shake） |
+| **运行时禁动态 import()** | 思源插件为 CJS 环境，rollup inlineDynamicImports 已全部内联 |
 
 ## 📄 License
 

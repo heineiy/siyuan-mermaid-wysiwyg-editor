@@ -25,6 +25,22 @@ export interface ExporterOptions {
 }
 
 const EXPORTER_ID_PREFIX = "id";
+
+/**
+ * 导出裁剪时四边保留的内边距（用户单位，约等于 px）。
+ * 取 2 是因为 SVG `getBBox()` 不包含描边（stroke），mermaid 连线默认 2px 线宽，
+ * 每边需留 1px 才能避免线条被裁掉，再留 1px 余量。
+ */
+export const EXPORT_PADDING = 2;
+
+/** SVG 用户坐标下的矩形（与 DOMRect 兼容的子集） */
+export interface SvgBox {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
 /**
  * 工具：自动生成唯一 id（避免多次 render 冲突）。
  *
@@ -79,18 +95,25 @@ export class Exporter {
   /**
    * 导出 SVG 原始矢量。
    *
+   * 两条路径都先收缩到图形内容边界（四边仅留 EXPORT_PADDING），
+   * 避免 mermaid 默认 padding / 画布视口带来大片空白。
+   *
    * @returns Blob type=image/svg+xml
    */
   async exportSVG(): Promise<Blob> {
     // 优先：直接取宿主已渲染的 SVG 节点导出，避免重新渲染
     const svgEl = this.opts.getSvgElement?.() ?? null;
     if (svgEl) {
-      return new Blob([Exporter.serializeSVG(svgEl)], { type: "image/svg+xml" });
+      return new Blob([Exporter.serializeSVG(Exporter.normalizeSvgBounds(svgEl))], {
+        type: "image/svg+xml",
+      });
     }
     // 兜底：重新 mermaid.render
     Exporter.assertCode(this.opts.getCode());
     const svg = await this.renderWithRetry(this.opts.getCode());
-    return new Blob([svg], { type: "image/svg+xml" });
+    return new Blob([Exporter.serializeSVG(Exporter.normalizeSvgBounds(Exporter.parseSvg(svg) as unknown as SVGSVGElement))], {
+      type: "image/svg+xml",
+    });
   }
 
   /**
@@ -104,8 +127,10 @@ export class Exporter {
     // 尺寸，避免 Visimer 画布 panZoom 包装导致 viewBox 失真 → 导出尺寸错、模糊。
     Exporter.assertCode(this.opts.getCode());
     const svgStr = await this.renderWithRetry(this.opts.getCode());
-    const root = Exporter.parseSvg(svgStr);
-    return Exporter.svgElementToPngBlob(root as unknown as SVGSVGElement, scale);
+    const root = Exporter.parseSvg(svgStr) as unknown as SVGSVGElement;
+    // 收缩 viewBox 到图形实际内容边界，去掉四周空白
+    const tight = Exporter.normalizeSvgBounds(root);
+    return Exporter.svgElementToPngBlob(tight, scale);
   }
 
   // ---------- 下载 + 复制 ----------
@@ -209,8 +234,154 @@ export class Exporter {
   }
 
   /** 序列化 SVG 元素为 XML 字符串（参考 copyAsImage serializeSVG）。 */
-  static serializeSVG(svg: SVGSVGElement): string {
-    return new XMLSerializer().serializeToString(svg);
+  static serializeSVG(svgEl: SVGSVGElement): string {
+    return new XMLSerializer().serializeToString(svgEl);
+  }
+
+  /**
+   * 读取 SVG 的视口矩形（viewBox 优先，其次数值型 width/height）。
+   *
+   * 百分比尺寸（如 `width="100%"`）没有内在尺寸，返回 null——调用方保持原样，
+   * 不做裁剪，避免算出错误视口。
+   */
+  static readViewBox(svgEl: SVGSVGElement): SvgBox | null {
+    const raw = svgEl.getAttribute("viewBox");
+    if (raw) {
+      const parts = raw.trim().split(/[\s,]+/).map(Number);
+      if (parts.length !== 4) return null;
+      const [x, y, width, height] = parts;
+      if (x === undefined || y === undefined || width === undefined || height === undefined) return null;
+      if (![x, y, width, height].every((n) => Number.isFinite(n)) || width <= 0 || height <= 0) return null;
+      return { x, y, width, height };
+    }
+    const w = Exporter.parseLength(svgEl.getAttribute("width"));
+    const h = Exporter.parseLength(svgEl.getAttribute("height"));
+    if (w === null || h === null || w <= 0 || h <= 0) return null;
+    return { x: 0, y: 0, width: w, height: h };
+  }
+
+  /**
+   * 计算导出用的紧凑视口。
+   *
+   * 内容包围盒无效（未测量到 / 全 0 / NaN）时回退到原视口，
+   * 保证裁剪逻辑只会“减少空白”，不会因测量失败而破坏导出。
+   */
+  static computeTightBox(
+    content: SvgBox | null | undefined,
+    current: SvgBox,
+    padding: number = EXPORT_PADDING,
+  ): SvgBox {
+    const valid =
+      content != null &&
+      [content.x, content.y, content.width, content.height].every((n) => Number.isFinite(n)) &&
+      content.width > 0 &&
+      content.height > 0;
+    if (!valid) return current;
+    return {
+      x: content.x - padding,
+      y: content.y - padding,
+      width: content.width + padding * 2,
+      height: content.height + padding * 2,
+    };
+  }
+
+  /**
+   * 把 SVG 视口收缩到图形实际内容边界，四边仅保留 padding。
+   *
+   * 背景：mermaid 默认带 diagramPadding（如 flowchart 上下左右各 8），宿主画布
+   * 的 SVG 更是按整个可视区域设 viewBox，直接导出会得到四周大片空白的图片。
+   *
+   * `getBBox()` 需要元素有布局，因此先把克隆挂到屏外容器测量，再移除。
+   * 测量失败 / 环境不支持（如 happy-dom）时原样返回，导出链路不受影响。
+   *
+   * @returns 已裁剪的 SVG 克隆（不修改传入元素）
+   */
+  static normalizeSvgBounds(svgEl: SVGSVGElement, padding: number = EXPORT_PADDING): SVGSVGElement {
+    const clone = svgEl.cloneNode(true) as SVGSVGElement;
+    if (!clone.getAttribute("xmlns")) clone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+
+    const current = Exporter.readViewBox(clone);
+    if (!current) return clone;
+
+    let content: SvgBox | null = null;
+    const host = document.createElement("div");
+    host.setAttribute("aria-hidden", "true");
+    host.style.cssText = "position:fixed;left:-100000px;top:0;opacity:0;pointer-events:none";
+    document.body.appendChild(host);
+    try {
+      host.appendChild(clone);
+      content = Exporter.measureContentBox(clone);
+    } catch {
+      // 测量失败（跨环境/异常 DOM）→ 不裁剪
+      content = null;
+    } finally {
+      host.remove();
+    }
+
+    const box = Exporter.computeTightBox(content, current, padding);
+    if (box === current) return clone;
+
+    clone.setAttribute("viewBox", `${box.x} ${box.y} ${box.width} ${box.height}`);
+    clone.setAttribute("width", String(box.width));
+    clone.setAttribute("height", String(box.height));
+    // 宿主画布/ mermaid 可能带 max-width、100% 宽高等内联样式，会压过上面的数值尺寸
+    clone.style.maxWidth = "";
+    clone.style.width = `${box.width}px`;
+    clone.style.height = `${box.height}px`;
+    return clone;
+  }
+
+  /** 用 `getBBox()` 测量 SVG 内容包围盒；不可用或无效时返回 null。 */
+  static measureContentBox(svgEl: SVGSVGElement): SvgBox | null {
+    const own = Exporter.measureElement(svgEl);
+    if (own) return own;
+
+    // 回退：部分引擎未在根 <svg> 上实现 getBBox，改为合并直接图形子元素的包围盒
+    let union: SvgBox | null = null;
+    for (const child of Array.from(svgEl.children)) {
+      const tag = child.tagName.toLowerCase();
+      if (tag === "defs" || tag === "style" || tag === "title" || tag === "desc") continue;
+      const box = Exporter.measureElement(child);
+      if (!box) continue;
+      union = union ? Exporter.unionBox(union, box) : box;
+    }
+    return union;
+  }
+
+  /** 测量单个元素的 `getBBox()`；不可用 / 抛错 / 无效时返回 null。 */
+  private static measureElement(el: Element): SvgBox | null {
+    const measurable = el as unknown as { getBBox?: () => SvgBox };
+    if (typeof measurable.getBBox !== "function") return null;
+    let box: SvgBox;
+    try {
+      box = measurable.getBBox();
+    } catch {
+      return null;
+    }
+    if (!box || !Number.isFinite(box.width) || !Number.isFinite(box.height)) return null;
+    if (box.width <= 0 || box.height <= 0) return null;
+    return { x: box.x, y: box.y, width: box.width, height: box.height };
+  }
+
+  /** 合并两个包围盒。 */
+  private static unionBox(a: SvgBox, b: SvgBox): SvgBox {
+    const x = Math.min(a.x, b.x);
+    const y = Math.min(a.y, b.y);
+    return {
+      x,
+      y,
+      width: Math.max(a.x + a.width, b.x + b.width) - x,
+      height: Math.max(a.y + a.height, b.y + b.height) - y,
+    };
+  }
+
+  /** 解析长度属性为数字；百分比/非法值返回 null。 */
+  private static parseLength(value: string | null): number | null {
+    if (!value) return null;
+    const trimmed = value.trim();
+    if (trimmed.endsWith("%")) return null;
+    const n = parseFloat(trimmed);
+    return Number.isFinite(n) ? n : null;
   }
 
   /**
@@ -224,12 +395,13 @@ export class Exporter {
    */
   static svgElementToPngBlob(svgEl: SVGSVGElement, scale: 1 | 2 | 3 = 2): Promise<Blob> {
     const clone = svgEl.cloneNode(true) as SVGSVGElement;
-    // 尺寸优先取 viewBox（mermaid 精确图形边界）；其次 width/height 属性；最后默认 800x600
-    const vb = svgEl.viewBox.baseVal;
-    const attrW = parseFloat(svgEl.getAttribute("width") || "");
-    const attrH = parseFloat(svgEl.getAttribute("height") || "");
-    const w = vb && vb.width ? vb.width : attrW || svgEl.clientWidth || 800;
-    const h = vb && vb.height ? vb.height : attrH || svgEl.clientHeight || 600;
+    // 尺寸优先取 viewBox（已由 normalizeSvgBounds 收缩为图形内容边界）；
+    // 其次 width/height 属性；最后默认 800x600
+    const box = Exporter.readViewBox(svgEl);
+    const attrW = Exporter.parseLength(svgEl.getAttribute("width"));
+    const attrH = Exporter.parseLength(svgEl.getAttribute("height"));
+    const w = box?.width || attrW || svgEl.clientWidth || 800;
+    const h = box?.height || attrH || svgEl.clientHeight || 600;
     const aspect = h > 0 ? w / h : 1;
     const targetW = 1920;
     const targetH = Math.round(targetW / aspect);

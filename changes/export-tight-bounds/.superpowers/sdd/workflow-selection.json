@@ -1,0 +1,13 @@
+{
+  "schema_version": 3,
+  "status": "ready",
+  "selection": {
+    "authorization_id": "a5185935-c398-4e80-b932-0395bfbecde1",
+    "mode": "quick",
+    "source": "direct-request",
+    "scope_confirmation": "PNG/SVG 导出与复制（下载 PNG 2x/3x、下载 SVG、复制 PNG/SVG）统一按图形实际内容包围盒裁剪 viewBox，四边仅保留 2px 内边距，消除导出图片四周大片空白；不改变编辑器画布显示、不改变 Markdown 写回逻辑",
+    "verification_strategy": "bounded",
+    "confirmed_at": "2026-10-23T09:43:19.704Z"
+  },
+  "hash": "sha256:1060f392e98e62772d1c10fe145330708650bd498ba53e228672550a61f91a07"
+}

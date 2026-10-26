@@ -21,7 +21,6 @@ const mocks = vi.hoisted(() => {
     undo = vi.fn();
     redo = vi.fn();
     deleteEntities = vi.fn();
-    code = "";
     code: string;
     changeHandlers: Array<({ code }: { code: string }) => void> = [];
     constructor(opts: { code: string }) {

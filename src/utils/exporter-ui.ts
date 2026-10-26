@@ -20,6 +20,8 @@ export interface ExportDropdownOptions {
   getType?: () => string;
   /** 错误提示挂载点（可选，没有则静默失败） */
   statusLabel?: HTMLElement | null;
+  /** 可选：宿主已渲染的 SVG（导出 SVG 时优先复用，避免重新渲染） */
+  getSvgElement?: () => SVGSVGElement | null;
 }
 
 /**
@@ -33,7 +35,7 @@ export interface ExportDropdownOptions {
  * 返回可直接 appendChild 到 toolbar 的 HTMLElement。
  */
 export function buildExportDropdown(opts: ExportDropdownOptions): HTMLElement {
-  const { getCode, getType, statusLabel } = opts;
+  const { getCode, getType, statusLabel, getSvgElement } = opts;
 
   // 与 Visimer 工具栏按钮样式对齐；padding/min-width 留余量，避免中英切换文字被遮挡
   const btnBase: Record<string, string> = {
@@ -131,7 +133,7 @@ export function buildExportDropdown(opts: ExportDropdownOptions): HTMLElement {
 
   const runExport = async (format: "png" | "svg", scale?: 2 | 3) => {
     if (!mm?.render) throw new Error("mermaid 模块不可用");
-    const exp = new Exporter({ getCode, mermaid: mm });
+    const exp = new Exporter({ getCode, mermaid: mm, getSvgElement });
     let blob: Blob;
     if (format === "svg") {
       blob = await exp.exportSVG();
@@ -145,7 +147,7 @@ export function buildExportDropdown(opts: ExportDropdownOptions): HTMLElement {
 
   const runCopy = async (format: "png" | "svg") => {
     if (!mm?.render) throw new Error("mermaid 模块不可用");
-    const exp = new Exporter({ getCode, mermaid: mm });
+    const exp = new Exporter({ getCode, mermaid: mm, getSvgElement });
     if (format === "svg") await exp.copySVG();
     else await exp.copyPNG();
   };

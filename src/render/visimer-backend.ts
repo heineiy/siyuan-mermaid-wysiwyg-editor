@@ -353,7 +353,7 @@ export class VisimerBackend implements RenderBackend {
     // Connect：单击进入连线；再点切换「锁定连续连线」。
     // 默认连完一条(触发 change)自动回 Select；锁定态连完不跳，可连多条，直到手动点 Select。
     const connectBtn = makeBtn(t("tool.connect"), () => {
-      if (view.tool !== "connect") {
+      if (view.currentTool !== "connect") {
         connectLocked = false;
         view.setTool("connect");
       } else {
@@ -498,7 +498,7 @@ export class VisimerBackend implements RenderBackend {
     updateUndoRedo();
     // 连线完成（dispatch connect 会触发 change）：非锁定时自动回 Select；锁定时保持连线
     editor.on("change", () => {
-      if (view.tool === "connect" && !connectLocked) {
+      if (view.currentTool === "connect" && !connectLocked) {
         view.setTool("select");
         setActiveBtn(selectBtn);
         updateConnectBtnStyle();
