@@ -1,0 +1,6 @@
+{
+  "previous_plan_hash": "sha256:bd3374ceb9e2c51c08c121f4646b1450af50c40249aa6e1169f4f3c6a12dc6f5",
+  "previous_revision": 1,
+  "reason": "同一批准范围：仅补记任务完成证据与勾选状态，未变更范围（用户已批准三项改造）",
+  "evidence": "scope changed: passing evidence invalidated; failures retained"
+}

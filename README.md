@@ -288,9 +288,12 @@ siyuan-mermaid-wysiwyg-editor/
 │   ├── plugin.json         #   清单
 │   ├── icon.png            #   图标
 │   ├── preview.png         #   预览图
+│   ├── i18n/               #   中英词典（宿主 plugin.i18n 加载）
 │   └── README.md / LICENSE #   文档
+├── i18n/                   # 官方 i18n 词典源文件：en.json / zh_CN.json
 ├── package.zip             # 根目录打包（vite-plugin-zip-pack 自动产出）
-├── plugin.json             # 思源插件清单
+├── plugin.json             # 思源插件清单（本地化键用 zh_CN）
+├── CHANGELOG.md            # 版本记录（随包分发）
 ├── vite.config.mts         # Vite 配置（inlineDynamicImports + named exports + zipPack）
 ├── gh_release.sh           # 一键发布（提取 CHANGELOG 对应版本段 + 上传 package.zip）
 └── tsconfig.json

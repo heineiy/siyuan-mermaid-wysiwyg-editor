@@ -1,6 +1,6 @@
 import { defineConfig } from "vitest/config";
 import type { Plugin } from "vite";
-import { copyFileSync, mkdirSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 import zipPack from "vite-plugin-zip-pack";
 
@@ -18,6 +18,7 @@ const copyStaticAssets = (): Plugin => {
     "preview.png",
     "README.md",
     "README.en.md",
+    "CHANGELOG.md",
     "LICENSE",
   ];
   return {
@@ -35,6 +36,15 @@ const copyStaticAssets = (): Plugin => {
         } catch {
           // 允许某些文件缺失（如 README.en.md），静默跳过
         }
+      }
+      // 思源插件官方 i18n 目录：plugin.i18n 由宿主按界面语言自动加载
+      const i18nSrc = resolve("i18n");
+      if (!existsSync(i18nSrc)) return;
+      const i18nOut = resolve(outDir, "i18n");
+      mkdirSync(i18nOut, { recursive: true });
+      for (const file of readdirSync(i18nSrc)) {
+        if (!file.endsWith(".json")) continue;
+        copyFileSync(resolve(i18nSrc, file), resolve(i18nOut, file));
       }
     },
   };
