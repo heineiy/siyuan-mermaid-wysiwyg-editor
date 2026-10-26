@@ -10,7 +10,7 @@ completion_reason: null
 revision: null
 
 # === Hashes (fast staleness detection) ===
-artifacts_hash: sha256:28a9c3551dba2770358d38403a23fe0782f797cce161716bd30f22137744ef9f
+artifacts_hash: sha256:5b4313d350e7653bd14050ac74dde8674dd0b120f64eb9044924c593ec1a26b9
 contract_hash: null
 
 # === Execution progress ===
@@ -18,13 +18,13 @@ execution_mode: null
 execution_plan_hash: null
 execution_plan_revision: null
 batches_completed: 0
-test_result: null
+test_result: pass: npm test
 spec_merged: false
 spec_publication_receipt: null
 
 # === Metadata ===
 change_name: i18n-remaining-strings
-last_transition: 2026-10-26T01:56:45.113Z
+last_transition: 2026-10-26T02:02:29.920Z
 last_transition_from: null
 last_transition_to: null
 

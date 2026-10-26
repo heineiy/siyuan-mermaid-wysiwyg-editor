@@ -1,7 +1,7 @@
 {
   "mode": "inline",
   "source": "approved-plan",
-  "rationale": "用户明确要求把剩余硬编码文案统一迁移到 i18n/*.json，并统一验证（'现在就做，我统一验证'）",
+  "rationale": "同一批准范围：仅补记任务完成证据与勾选状态，未变更范围（用户已要求立即执行并统一验证）",
   "waves": [
     {
       "id": "implementation",
@@ -17,11 +17,11 @@
       "depends_on": []
     }
   ],
-  "artifacts_hash": "sha256:28a9c3551dba2770358d38403a23fe0782f797cce161716bd30f22137744ef9f",
+  "artifacts_hash": "sha256:5b4313d350e7653bd14050ac74dde8674dd0b120f64eb9044924c593ec1a26b9",
   "contract_hash": null,
   "workflow": "full",
-  "revision": 1,
+  "revision": 2,
   "schema_version": 2,
   "review_policy": "final",
-  "hash": "sha256:b511f7ce6b3df33690379a68897547e03daecd4c59b9c2f4ba05843494b09501"
+  "hash": "sha256:fa5c93e19e9d671675d7859384a1b530cd2e090a48bafc86a4781a8cc4f875a0"
 }
