@@ -128,11 +128,11 @@ export function buildExportDropdown(opts: ExportDropdownOptions): HTMLElement {
   // 同模块静态 import dedupe 到同一个模块实例
   const mm = mermaid as any;
   if (!mm?.render) {
-    showError("mermaid 模块缺失（构建异常）");
+    showError(t("export.mermaidMissing"));
   }
 
   const runExport = async (format: "png" | "svg", scale?: 2 | 3) => {
-    if (!mm?.render) throw new Error("mermaid 模块不可用");
+    if (!mm?.render) throw new Error(t("export.mermaidUnavailable"));
     const exp = new Exporter({ getCode, mermaid: mm, getSvgElement });
     let blob: Blob;
     if (format === "svg") {
@@ -140,13 +140,13 @@ export function buildExportDropdown(opts: ExportDropdownOptions): HTMLElement {
     } else {
       blob = await exp.exportPNG(scale ?? 2);
     }
-    const t = getType ? getType() : "diagram";
-    const fname = Exporter.buildFileName(t, format);
+    const diagramType = getType ? getType() : "diagram";
+    const fname = Exporter.buildFileName(diagramType, format);
     Exporter.downloadBlob(blob, fname);
   };
 
   const runCopy = async (format: "png" | "svg") => {
-    if (!mm?.render) throw new Error("mermaid 模块不可用");
+    if (!mm?.render) throw new Error(t("export.mermaidUnavailable"));
     const exp = new Exporter({ getCode, mermaid: mm, getSvgElement });
     if (format === "svg") await exp.copySVG();
     else await exp.copyPNG();

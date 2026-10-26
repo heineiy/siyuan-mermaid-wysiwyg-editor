@@ -31,8 +31,9 @@ export function setPluginI18n(dict: Record<string, string> | null | undefined): 
   pluginDict = dict ?? null;
 }
 
-/** 当前界面语言：思源 `<html lang="zh-CN">` / `"en_US"`。 */
+/** 当前界面语言：思源 `<html lang="zh-CN">` / `"en_US"`；无 DOM 环境（Node 测试/构建）返回空串。 */
 export function currentLang(): string {
+  if (typeof document === "undefined") return "";
   return (document.documentElement.getAttribute("lang") || "").toLowerCase();
 }
 

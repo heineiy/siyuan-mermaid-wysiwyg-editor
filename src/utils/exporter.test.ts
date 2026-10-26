@@ -7,6 +7,7 @@
  */
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { Exporter } from "./exporter.js";
+import { t } from "./i18n.js";
 
 // --- mock mermaid.render ---
 const mockRender = vi.fn<(id: string, code: string) => Promise<{ svg: string }>>();
@@ -183,16 +184,16 @@ describe("Exporter", () => {
     });
 
     it("空字符串 → 抛清晰错误（防原本的裸 getAttribute TypeError）", () => {
-      expect(() => Exporter.parseSvg("")).toThrow("未返回有效的 SVG");
+      expect(() => Exporter.parseSvg("")).toThrow(t("export.svgInvalid"));
     });
 
     it("空白字符串 → 抛清晰错误", () => {
-      expect(() => Exporter.parseSvg("   \n  ")).toThrow("未返回有效的 SVG");
+      expect(() => Exporter.parseSvg("   \n  ")).toThrow(t("export.svgInvalid"));
     });
 
     it("非法 XML / 非 svg 根（如 <parsererror>）→ 抛清晰错误", () => {
       // DOMParser 对非法 XML 会产出 <parsererror> 根，或对纯文本产出非 svg 根
-      expect(() => Exporter.parseSvg("not xml at all")).toThrow("未返回有效的 SVG");
+      expect(() => Exporter.parseSvg("not xml at all")).toThrow(t("export.svgInvalid"));
     });
   });
 

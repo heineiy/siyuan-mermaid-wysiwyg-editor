@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AdapterRegistry } from "../adapters/registry";
 import type { AdapterOptions, DiagramAdapter } from "../adapters/registry";
 import { initEditorSession } from "./sync";
+import { t } from "../utils/i18n";
 
 /**
  * T13 语法/加载错误保护测试（REQ-ERROR-001 / design.md Risks）。
@@ -120,7 +121,7 @@ describe("T13 backend init 拒绝（REQ-ERROR-001）", () => {
     const session = await initEditorSession(baseOpts({ registry, container, updateBlock }));
 
     expect(container.querySelector(".mermaid-wysiwyg-error")).not.toBeNull();
-    expect(container.textContent).toContain("可视化编辑器加载失败");
+    expect(container.textContent).toContain(t("error.loadFailed"));
     expect(container.textContent).toContain("404 not found");
     // 保留原文本：不写回
     expect(updateBlock).not.toHaveBeenCalled();
@@ -141,7 +142,7 @@ describe("T13 backend init 拒绝（REQ-ERROR-001）", () => {
     const session = await initEditorSession(baseOpts({ registry, container, updateBlock }));
 
     expect(container.querySelector(".mermaid-wysiwyg-error")).not.toBeNull();
-    expect(container.textContent).toContain("可视化编辑器加载失败");
+    expect(container.textContent).toContain(t("error.loadFailed"));
     expect(container.textContent).toContain("backend crashed");
     expect(updateBlock).not.toHaveBeenCalled();
 

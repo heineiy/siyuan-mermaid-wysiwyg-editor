@@ -1,0 +1,27 @@
+{
+  "mode": "inline",
+  "source": "approved-plan",
+  "rationale": "同一批准范围：仅补记任务完成证据与勾选状态，未变更范围（用户已要求立即执行并统一验证）",
+  "waves": [
+    {
+      "id": "implementation",
+      "strategy": "serial",
+      "tasks": [
+        "1",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6"
+      ],
+      "depends_on": []
+    }
+  ],
+  "artifacts_hash": "sha256:5b4313d350e7653bd14050ac74dde8674dd0b120f64eb9044924c593ec1a26b9",
+  "contract_hash": null,
+  "workflow": "full",
+  "revision": 2,
+  "schema_version": 2,
+  "review_policy": "final",
+  "hash": "sha256:fa5c93e19e9d671675d7859384a1b530cd2e090a48bafc86a4781a8cc4f875a0"
+}

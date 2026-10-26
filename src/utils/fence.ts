@@ -22,6 +22,8 @@
  *   内容中同处一行的 `` ``` `` 会被保留（见测试）。
  */
 
+import { t } from "./i18n";
+
 const OPEN_FENCE = "```mermaid";
 const CLOSE_FENCE = "```";
 
@@ -36,7 +38,7 @@ export function stripFence(markdown: string): string {
   const text = normalizeEol(markdown);
   const firstNl = text.indexOf("\n");
   if (firstNl === -1 || text.slice(0, firstNl) !== OPEN_FENCE) {
-    throw new Error("stripFence: 输入不是 mermaid 围栏代码块（首行必须为 ```mermaid）");
+    throw new Error(`${t("error.notMermaidBlock")} (stripFence: expect \`\`\`mermaid on the first line)`);
   }
 
   // 首行围栏之后的内容（含结尾围栏）。
@@ -45,7 +47,7 @@ export function stripFence(markdown: string): string {
     return ""; // 只有围栏没有内容
   }
   if (!rest.endsWith("\n" + CLOSE_FENCE)) {
-    throw new Error("stripFence: 缺少以最后一行 ``` 结尾的围栏");
+    throw new Error(`${t("error.unclosedFence")} (stripFence: expect a closing \`\`\`)`);
   }
 
   // 去除结尾围栏及其前一个结构性换行；内容区（含前导/尾随空行）原样返回。

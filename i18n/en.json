@@ -38,5 +38,20 @@
   "status.ok": "Syntax valid",
   "status.init": "Initializing...",
   "error.syntax": "Mermaid syntax error",
-  "error.fixHint": "Fix the code in the left textarea; it auto-saves when valid"
+  "error.fixHint": "Fix the code in the left textarea; it auto-saves when valid",
+  "settings.shortcutTitle": "Shortcut",
+  "settings.shortcutDesc": "Default ⌥⇧M (Shift+Alt+M). Customize in Siyuan → Settings → Keymap → Plugins → Mermaid WYSIWYG Editor.",
+  "error.loadFailed": "Failed to load visual editor",
+  "error.readonlyFailed": "Failed to load read-only preview",
+  "error.unknownType": "Visual editing is not supported for this diagram type",
+  "error.readonlyType": "This diagram type is read-only",
+  "error.getBlockFailed": "Failed to read block content",
+  "error.updateBlockFailed": "Failed to write block content",
+  "error.notMermaidBlock": "Target block is not a Mermaid code block",
+  "error.unclosedFence": "Mermaid code block is missing the closing fence",
+  "export.mermaidMissing": "mermaid module missing (build error)",
+  "export.mermaidUnavailable": "mermaid module unavailable",
+  "export.svgInvalid": "Invalid SVG returned; cannot export",
+  "export.svgLoadFailed": "SVG failed to load",
+  "export.blobNull": "Export failed: canvas returned an empty image"
 }

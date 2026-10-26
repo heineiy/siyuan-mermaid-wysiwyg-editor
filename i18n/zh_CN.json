@@ -38,5 +38,20 @@
   "status.ok": "语法正确",
   "status.init": "初始化...",
   "error.syntax": "Mermaid 语法错误",
-  "error.fixHint": "在左侧代码区修正，语法正确后自动保存回思源"
+  "error.fixHint": "在左侧代码区修正，语法正确后自动保存回思源",
+  "settings.shortcutTitle": "快捷键",
+  "settings.shortcutDesc": "默认 ⌥⇧M（Shift+Alt+M）。可通过思源 设置 → 快捷键 → 插件 → Mermaid WYSIWYG Editor 自定义。",
+  "error.loadFailed": "可视化编辑器加载失败",
+  "error.readonlyFailed": "只读预览加载失败",
+  "error.unknownType": "该图类型暂不支持可视化编辑",
+  "error.readonlyType": "该图类型当前仅支持只读预览",
+  "error.getBlockFailed": "读取块内容失败",
+  "error.updateBlockFailed": "写回块内容失败",
+  "error.notMermaidBlock": "目标块不是 Mermaid 代码块",
+  "error.unclosedFence": "Mermaid 代码块缺少结束围栏",
+  "export.mermaidMissing": "mermaid 模块缺失（构建异常）",
+  "export.mermaidUnavailable": "mermaid 模块不可用",
+  "export.svgInvalid": "未返回有效的 SVG，无法导出",
+  "export.svgLoadFailed": "SVG 加载失败",
+  "export.blobNull": "导出失败：canvas 返回空图片"
 }

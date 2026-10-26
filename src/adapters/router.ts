@@ -20,6 +20,7 @@
  */
 
 import type { AdapterRegistry, DiagramAdapter } from "./registry";
+import { t } from "../utils/i18n";
 import {
   DIAGRAM_TYPES,
   classifyLines,
@@ -87,11 +88,11 @@ export function isKnownDiagramType(type: string): boolean {
   return KNOWN_TYPES.has(type);
 }
 
-/** 未知类型兜底提示文案。 */
-export const UNKNOWN_TYPE_MESSAGE = "该图类型暂不支持可视化编辑";
+/** 未知类型兜底提示文案（按当前界面语言）。 */
+export const unknownTypeMessage = () => t("error.unknownType");
 
-/** 已知类型仅只读的提示文案。 */
-export const READONLY_TYPE_MESSAGE = "该图类型当前仅支持只读预览";
+/** 已知类型仅只读的提示文案（按当前界面语言）。 */
+export const readonlyTypeMessage = () => t("error.readonlyType");
 
 /** 路由结果：三路可区分，携带提示文案与适配器。 */
 export type RouteResult =
@@ -128,7 +129,7 @@ export function route(code: string, registry: AdapterRegistry): RouteResult {
   const normalizedType = detectDiagramType(code);
   if (normalizedType === null) {
     // 空代码：无可判定类型 → 兜底只读提示。
-    return { kind: "unknown", type: "", adapter: null, message: UNKNOWN_TYPE_MESSAGE };
+    return { kind: "unknown", type: "", adapter: null, message: unknownTypeMessage() };
   }
 
   const adapter = registry.get(normalizedType);
@@ -137,9 +138,9 @@ export function route(code: string, registry: AdapterRegistry): RouteResult {
   }
   if (isKnownDiagramType(normalizedType)) {
     // 已知类型但无 full 适配器 → 只读预览（有已注册 readonly 适配器则携带，否则上层兜底）。
-    return { kind: "readonly", type: normalizedType, adapter: adapter ?? null, message: READONLY_TYPE_MESSAGE };
+    return { kind: "readonly", type: normalizedType, adapter: adapter ?? null, message: readonlyTypeMessage() };
   }
   // 未知类型：用原始 header token 展示给用户
   const rawType = detectHeaderToken(code) ?? normalizedType;
-  return { kind: "unknown", type: rawType, adapter: null, message: UNKNOWN_TYPE_MESSAGE };
+  return { kind: "unknown", type: rawType, adapter: null, message: unknownTypeMessage() };
 }
