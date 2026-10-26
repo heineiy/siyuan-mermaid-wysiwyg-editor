@@ -13,6 +13,8 @@
  * 渲染问题，也更快）。宿主未渲染出 SVG 时才回退到重新 render。
  */
 
+import { t } from "./i18n";
+
 export interface ExporterOptions {
   /** 获取当前 Mermaid 源码（渲染兜底时使用） */
   getCode: () => string;
@@ -223,7 +225,7 @@ export class Exporter {
     const doc = new DOMParser().parseFromString(svg, "image/svg+xml");
     const root = doc.documentElement;
     if (!root || root.tagName.toLowerCase() !== "svg") {
-      throw new Error("Mermaid 未返回有效的 SVG（渲染可能失败），无法导出");
+      throw new Error(t("export.svgInvalid"));
     }
     return root;
   }
@@ -455,7 +457,7 @@ export class Exporter {
     img.crossOrigin = "anonymous";
     const loaded = new Promise<HTMLImageElement>((resolve, reject) => {
       img.onload = () => resolve(img);
-      img.onerror = () => reject(new Error("SVG 加载失败（可能有 external 资源）"));
+      img.onerror = () => reject(new Error(t("export.svgLoadFailed")));
     });
     img.src = dataUri;
     await loaded;
@@ -471,7 +473,7 @@ export class Exporter {
 
     return await new Promise<Blob>((resolve, reject) => {
       canvas.toBlob(
-        (b) => (b ? resolve(b) : reject(new Error("canvas.toBlob 返回 null"))),
+        (b) => (b ? resolve(b) : reject(new Error(t("export.blobNull")))),
         "image/png",
       );
     });

@@ -4,6 +4,7 @@
  */
 import { describe, it, expect, beforeEach } from "vitest";
 import { t, setPluginI18n } from "./i18n";
+import { readonlyTypeMessage, unknownTypeMessage } from "../adapters/router";
 import en from "../../i18n/en.json";
 import zhCN from "../../i18n/zh_CN.json";
 
@@ -57,5 +58,15 @@ describe("i18n", () => {
 
   it("中英词典 key 集合完全一致（防漂移）", () => {
     expect(Object.keys(zhCN).sort()).toEqual(Object.keys(en).sort());
+  });
+
+  it("router 提示文案随语言切换（不再硬编码中文）", () => {
+    setLang("zh-CN");
+    expect(unknownTypeMessage()).toBe(zhCN["error.unknownType"]);
+    expect(readonlyTypeMessage()).toBe(zhCN["error.readonlyType"]);
+
+    setLang("en_US");
+    expect(unknownTypeMessage()).toBe(en["error.unknownType"]);
+    expect(readonlyTypeMessage()).toBe(en["error.readonlyType"]);
   });
 });

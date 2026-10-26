@@ -37,6 +37,7 @@ import { stripFence, wrapFence } from "../utils/fence";
 import { route } from "../adapters/router";
 import { ReadOnlyAdapter } from "../adapters/readonly-adapter";
 import type { AdapterRegistry } from "../adapters/registry";
+import { t } from "../utils/i18n";
 
 /** initEditorSession 注入项（真实实现由 src/index.ts 接 window.siyuan 内核 API）。 */
 export interface InitEditorSessionOptions {
@@ -165,7 +166,7 @@ export async function initEditorSession(opts: InitEditorSessionOptions): Promise
         // Promise.resolve 吸收同步抛错与拒绝的 Promise 两种形态。
         await Promise.resolve(adapter.init(code, { container, onGraphChange }));
       } catch (err) {
-        renderMessage(container, `可视化编辑器加载失败：${errorText(err)}`, ERROR_DIV_CLASS);
+        renderMessage(container, `${t("error.loadFailed")}: ${errorText(err)}`, ERROR_DIV_CLASS);
         writeClosed = true;
         // 清掉 init 期间可能已聚合的变更（防御性：写回通道自此关闭）。
         writeDebounce.cancel();
@@ -250,7 +251,7 @@ export async function initEditorSession(opts: InitEditorSessionOptions): Promise
       try {
         await Promise.resolve(adapter.init(code, { container, onGraphChange }));
       } catch (err) {
-        renderMessage(container, `只读预览加载失败：${errorText(err)}`, ERROR_DIV_CLASS);
+        renderMessage(container, `${t("error.readonlyFailed")}: ${errorText(err)}`, ERROR_DIV_CLASS);
       }
 
       return {

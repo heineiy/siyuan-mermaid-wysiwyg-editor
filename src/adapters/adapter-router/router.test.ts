@@ -2,11 +2,11 @@ import { describe, expect, it } from "vitest";
 import { AdapterRegistry, type DiagramAdapter } from "../registry";
 import {
   KNOWN_DIAGRAM_TYPES,
-  READONLY_TYPE_MESSAGE,
-  UNKNOWN_TYPE_MESSAGE,
   detectDiagramType,
   isKnownDiagramType,
+  readonlyTypeMessage,
   route,
+  unknownTypeMessage,
 } from "../router";
 
 /**
@@ -121,7 +121,7 @@ describe("route：三路路由（REQ-DEGRADE-001）", () => {
     if (result.kind === "readonly") {
       expect(result.type).toBe("sequence");
       expect(result.adapter).toBe(readonly);
-      expect(result.message).toBe(READONLY_TYPE_MESSAGE);
+      expect(result.message).toBe(readonlyTypeMessage());
     }
   });
 
@@ -133,7 +133,7 @@ describe("route：三路路由（REQ-DEGRADE-001）", () => {
     expect(result.kind).toBe("readonly");
     if (result.kind === "readonly") {
       expect(result.adapter).toBeNull();
-      expect(result.message).toBe(READONLY_TYPE_MESSAGE);
+      expect(result.message).toBe(readonlyTypeMessage());
     }
   });
 
@@ -146,8 +146,7 @@ describe("route：三路路由（REQ-DEGRADE-001）", () => {
     if (result.kind === "unknown") {
       expect(result.type).toBe("someNewDiagram");
       expect(result.adapter).toBeNull();
-      expect(result.message).toBe(UNKNOWN_TYPE_MESSAGE);
-      expect(result.message).toContain("暂不支持可视化编辑");
+      expect(result.message).toBe(unknownTypeMessage());
     }
   });
 

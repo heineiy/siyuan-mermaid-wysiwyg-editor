@@ -1,0 +1,27 @@
+{
+  "mode": "inline",
+  "source": "approved-plan",
+  "rationale": "用户明确要求把剩余硬编码文案统一迁移到 i18n/*.json，并统一验证（'现在就做，我统一验证'）",
+  "waves": [
+    {
+      "id": "implementation",
+      "strategy": "serial",
+      "tasks": [
+        "1",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6"
+      ],
+      "depends_on": []
+    }
+  ],
+  "artifacts_hash": "sha256:28a9c3551dba2770358d38403a23fe0782f797cce161716bd30f22137744ef9f",
+  "contract_hash": null,
+  "workflow": "full",
+  "revision": 1,
+  "schema_version": 2,
+  "review_policy": "final",
+  "hash": "sha256:b511f7ce6b3df33690379a68897547e03daecd4c59b9c2f4ba05843494b09501"
+}

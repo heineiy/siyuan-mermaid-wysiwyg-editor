@@ -25,7 +25,7 @@ import { setPluginI18n, t } from "./utils/i18n";
 async function fetchBlockMarkdown(id: string): Promise<string> {
   const res = await fetchSyncPost("/api/block/getBlockKramdown", { id });
   if (res.code !== 0) {
-    throw new Error(`getBlockKramdown 失败: ${res.msg}`);
+    throw new Error(`${t("error.getBlockFailed")}: ${res.msg}`);
   }
   return stripKramdownIal((res.data as { kramdown: string }).kramdown);
 }
@@ -34,7 +34,7 @@ async function fetchBlockMarkdown(id: string): Promise<string> {
 async function fetchUpdateBlock(id: string, data: string): Promise<void> {
   const res = await fetchSyncPost("/api/block/updateBlock", { id, data, dataType: "markdown" });
   if (res.code !== 0) {
-    throw new Error(`updateBlock 失败: ${res.msg}`);
+    throw new Error(`${t("error.updateBlockFailed")}: ${res.msg}`);
   }
 }
 
@@ -101,9 +101,8 @@ export default class MermaidWysiwygEditorPlugin extends Plugin {
     // 设置面板：仅保留简短说明（快捷键改键思源内置处理，无需自建设置）
     this.setting = new Setting({});
     this.setting.addItem({
-      title: "快捷键",
-      description:
-        "默认 ⌥⇧M（Shift+Alt+M）。可通过思源 设置 → 快捷键 → 插件 → Mermaid WYSIWYG Editor 自定义。",
+      title: t("settings.shortcutTitle"),
+      description: t("settings.shortcutDesc"),
     });
   }
 
@@ -194,7 +193,7 @@ export default class MermaidWysiwygEditorPlugin extends Plugin {
         const c = handle.getContainer();
         if (c) {
           const message = err instanceof Error ? err.message : String(err);
-          c.innerHTML = `<div class="mermaid-wysiwyg-error">可视化编辑器加载失败：${message}</div>`;
+          c.innerHTML = `<div class="mermaid-wysiwyg-error">${t("error.loadFailed")}: ${message}</div>`;
         }
       }
     );
