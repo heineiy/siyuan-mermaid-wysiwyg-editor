@@ -288,9 +288,12 @@ siyuan-mermaid-wysiwyg-editor/
 │   ├── plugin.json         #   Manifest
 │   ├── icon.png            #   Icon
 │   ├── preview.png         #   Preview image
+│   ├── i18n/               #   zh_CN / en dictionaries (loaded by plugin.i18n)
 │   └── README.md / LICENSE #   Docs
+├── i18n/                   # Official i18n sources: en.json / zh_CN.json
 ├── package.zip             # Root-level bundle (auto from vite-plugin-zip-pack)
-├── plugin.json             # Siyuan plugin manifest
+├── plugin.json             # Siyuan plugin manifest (locale keys use zh_CN)
+├── CHANGELOG.md            # Version history (shipped in the package)
 ├── vite.config.mts         # Vite config (inlineDynamicImports + named exports + zipPack)
 ├── gh_release.sh           # One-click release (extracts CHANGELOG section + uploads package.zip)
 └── tsconfig.json

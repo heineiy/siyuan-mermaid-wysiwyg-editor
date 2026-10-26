@@ -7,7 +7,7 @@ import { initEditorSession, type EditorSession } from "./controller/sync";
 import { openEditorDialog } from "./controller/dialog";
 import { registerBlockIconTrigger } from "./controller/trigger";
 import { stripKramdownIal } from "./utils/fence";
-import { t } from "./utils/i18n";
+import { setPluginI18n, t } from "./utils/i18n";
 
 /**
  * 思源内核 API 最小封装（fetchSyncPost 由 siyuan 包运行时导出，siyuan.d.ts:401；
@@ -61,6 +61,9 @@ export default class MermaidWysiwygEditorPlugin extends Plugin {
 
   async onload() {
     console.log("[siyuan-mermaid-wysiwyg-editor] plugin loaded");
+
+    // 思源按界面语言自动加载 i18n/*.json 并填充 plugin.i18n；注入后 t() 优先用宿主文案
+    setPluginI18n(this.i18n);
 
     // ---- 适配器注册表：Visimer 全编辑 × 22 种 + 通配只读兜底 ----
     // DIAGRAM_TYPES 来自 @visimer/core，22 种 capability="edit"（含 flowchart/sequence/class/state/

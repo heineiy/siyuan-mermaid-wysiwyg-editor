@@ -15,15 +15,15 @@
   ],
   "displayName": {
     "default": "Mermaid WYSIWYG Editor",
-    "zh-CN": "Mermaid 双向可视化编辑"
+    "zh_CN": "Mermaid 双向可视化编辑"
   },
   "description": {
     "default": "Bidirectional WYSIWYG editor for Mermaid code blocks: drag nodes on canvas, edit text, and sync back to native markdown. Powered by Visimer.",
-    "zh-CN": "思源笔记 Mermaid 代码块双向可视化编辑：画布拖拽节点、双击改字，写回原生 Markdown 块，存储零失真。基于 Visimer。"
+    "zh_CN": "思源笔记 Mermaid 代码块双向可视化编辑：画布拖拽节点、双击改字，写回原生 Markdown 块，存储零失真。基于 Visimer。"
   },
   "readme": {
     "default": "README.en.md",
-    "zh-CN": "README.md"
+    "zh_CN": "README.md"
   },
   "icon": "icon.png",
   "preview": "preview.png",

@@ -1,0 +1,26 @@
+{
+  "mode": "inline",
+  "source": "approved-plan",
+  "rationale": "同一批准范围：仅补记任务完成证据与勾选状态，未变更范围（用户已批准三项改造）",
+  "waves": [
+    {
+      "id": "implementation",
+      "strategy": "serial",
+      "tasks": [
+        "1",
+        "2",
+        "3",
+        "4",
+        "5"
+      ],
+      "depends_on": []
+    }
+  ],
+  "artifacts_hash": "sha256:02dea319e6623584662687cffffaf63df860c113944ca20a23bf1d45cf3de0a1",
+  "contract_hash": null,
+  "workflow": "full",
+  "revision": 2,
+  "schema_version": 2,
+  "review_policy": "final",
+  "hash": "sha256:057371cb43a2b2add8877e04f0d334dd53acf6622dd85183c12b34011395730c"
+}
